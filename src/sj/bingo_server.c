@@ -24,8 +24,8 @@ int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
 int check_number[BOARD_SIZE*BOARD_SIZE+1]={0}; //중복검사용 배열
 int server_fd, client_fd; //소켓 파일디스크립터
 typedef struct people_information{
-	char name[21];
-	int age;
+	char name[30];
+	char pwd[30];
 }people_info;
 people_info people[100]; //최대 100명 구조체 배열 
 
@@ -62,31 +62,44 @@ void main(int argc, char *argv[])
 	
     //읽은 내용이 잘 저장됐는지 출력
     for (int i = 0; i < idx; i++) {
-        printf("%s %d\n", people[i].name, people[i].age);
+        printf("%s %s\n", people[i].name, people[i].pwd);
     }
 
 	
-	
+
 	socket_settings(argv[1]);
 	
 	int lens;
-	
-	//printf("%d" , idx);
+	char flag=0;//login error 0, in 1
 	//연결완료후 로그인
 	
-		lens = read(client_fd, ID, sizeof(ID));
-		//printf("%d",lens);
-		error_check(lens, "로그인 데이터 읽기");
+	lens = read(client_fd, ID, sizeof(ID));
+	//printf("%d",lens);
+	error_check(lens, "로그인 데이터 읽기");
 
-		//for(int i=0; , i<)
-		//	if(people[i].name == ID)
-		//		printf("아이디 확인 성공\n");
-		//	else {
-		//		printf("없는 아이디 입니다.\n");
-		//		exit(1);
-		///	}
-		
-
+	printf("ID : %s\n",ID);
+	lens = read(client_fd, pwd , sizeof(pwd));
+	error_check(lens , "비밀번호 쓰기");	
+	printf("PWD  : %s\n",pwd);
+	
+	printf("%d\n",idx);
+	//id 확인 
+	for(int i=0; i<idx; i++)
+	{
+		if(people[i].name == ID && people[i].pwd == pwd)
+		{
+			printf("로그인 완료\n");
+			flag ='1';
+			lens = write(client_fd, flag, sizeof(flag));
+			break;
+		}
+		else{
+			printf("비밀번호 및 로그인 실패\n");\
+			flag ='0';
+			lens = write(client_fd, flag, sizeof(flag));
+			
+		}
+	}
 	
 
 	printf("빙고게임을 시작합니다.\n");
@@ -143,7 +156,7 @@ int get_account(FILE * fp){
                 strcpy(people[idx].name, token);
             }
             else if (i == 1) {
-                people[idx].age = atoi(token);
+                strcpy(people[idx].pwd, token);
             }
             i++;
             token = strtok(NULL, " ");

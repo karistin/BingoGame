@@ -42,17 +42,34 @@ void main(int argc, char *argv[])
 
 	system("clear");
 	
+	
+	int lens;
+
 	printf("서버 접속을 성공했습니다!!\n");
 	printf("=======================\n");
 	
-		printf("ID를 입력하시오 : ");
-		scanf("%s",ID);
+	printf("ID를 입력하시오 : ");
+	scanf("%s",ID);
+	lens = write(socket_fd, ID, sizeof(ID));
+	error_check(lens, "로그인 데이터 쓰기");
+	printf("PWD를 입력하시오 : ");
+	scanf("%s" , pwd);
+	lens = write(socket_fd , pwd , sizeof(pwd));
+	error_check(lens, "비밀 번호 데이터 쓰기");
 
-		int lens;
+	//연결완료후 로그인 
+	char flag; //login error 0, in 1
 
-		//연결완료후 로그인 
-		lens = write(socket_fd, ID, sizeof(ID));
-		error_check(lens, "로그인 데이터 쓰기");
+	lens = read(socket_fd, flag , sizeof(flag));
+	error_check(lens , "로그인 확인 결과");
+	printf("%c\n",flag);
+	if(flag =='1' )
+		printf("로그인 성공\n");
+	else{
+		printf("로그인 실패\n");
+		exit(1);
+	}
+
 	
 	printf("빙고게임을 시작합니다.\n");
 	game_init();
