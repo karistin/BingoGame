@@ -9,7 +9,7 @@ bingo_client :  bingo_client.c
 	$(CC) $(CFLAGS) $^ -o $@ 
 
 bingo_server : bingo_server.c
-	$(CC) $(CFLAGS) $^ -o $@ 
+	$(CC) $(CFLAGS) $^ -o $@ -lpthread
 
 
 clean :

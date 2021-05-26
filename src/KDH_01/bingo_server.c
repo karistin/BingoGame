@@ -8,8 +8,6 @@ client_game_init 함수 부분 아래에 해당 내용 추가
 	printf("%d 바이트를 전송하였습니다\n", array_len);
 	error_check(array_len, "데이터전송");
 -----------------------------------------
-int turn[4] -> int turn[5] 로 바꾸고  turn[4]=클라이언트 index( 1번부터 시작 )
------------------------------------------
 
  for(i=0; i<5; i++)
  44     {
@@ -25,7 +23,7 @@ int turn[4] -> int turn[5] 로 바꾸고  turn[4]=클라이언트 index( 1번부
  54         close(clnt_sock);
  55     }
 
-*/
+
 #incl for(i=0; i<5; i++)
  44     {
  45         clnt_sock=accept(serv_sock, (struct sockaddr*)&clnt_adr, &clnt_adr_sz);
@@ -39,20 +37,27 @@ int turn[4] -> int turn[5] 로 바꾸고  turn[4]=클라이언트 index( 1번부
  53
  54         close(clnt_sock);
  55     }
-ude <stdio.h>
+*/
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <pthread.h> //-
 #define BOARD_SIZE 5
 #define BACKLOG 3 //연결대기 큐 숫자
+#define CLNT_BUF_SIZE 256 //-
 
+
+void * handle_clnt(void * arg); // 테스트용 나중에[삭제] --------------------
 void socket_settings(char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
 void server_game_init(); //서버 빙고판 생성
 void client_game_init(); //클라이언트 빙고판 생성
+void * client_game_init2(void * arg);
 void game_print(int turn_count); //빙고판 화면출력
 void server_turn(); //서버 차례
 void client_turn(); //클라이언트 차례
@@ -65,13 +70,22 @@ int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
 int check_number[BOARD_SIZE*BOARD_SIZE+1]={0}; //중복검사용 배열
 int server_fd, client_fd; //소켓 파일디스크립터
 
-int turn[5]; //어플리케이션 프로토콜 정의
+int clnt_buf [CLNT_BUF_SIZE];
+int clnt_count = 1;
+pthread_mutex_t mutx;
+int child_clnt_buf [2];
+int clnt_real_count = 0;
+int test = 0; // test용 나중에 삭제해
+
+pthread_t t_id[2];
+
+
+int turn[4]; //어플리케이션 프로토콜 정의
 /*
 	turn[0]=플레이어 숫자선택
 	turn[1]=클라이언트 빙고 수
 	turn[2]=서버 빙고 수
 	turn[3]=게임종료여부(0=진행중, 1=클라이언트 승리, 2=서버 승리, 3=무승부)
-	turn[4]=클라이언트 index( 1번부터 시작 / 1~2 소통, 3~4 소통 ... )
 
 */
 int turn_order[1]; // 
@@ -92,10 +106,11 @@ void main(int argc, char *argv[])
 	
 	
 	socket_settings(argv[1]);
-
 	printf("빙고게임을 시작합니다.\n");
+	
 	server_game_init();
-	client_game_init();
+//	client_game_init();
+
 	game_print(0);
 
 	for(i=1;i<=BOARD_SIZE*BOARD_SIZE;i++)
@@ -137,7 +152,8 @@ void socket_settings(char *port)
 {
 	struct sockaddr_in server_adr, client_adr;
 	socklen_t client_adr_size;
-
+	pid_t pid = 1;
+	pthread_mutex_init(&mutx, NULL);
 	server_fd=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //TCP 소켓 생성
 	error_check(server_fd, "소켓 생성");
 
@@ -146,16 +162,87 @@ void socket_settings(char *port)
 	server_adr.sin_family=AF_INET; //IPv4
 	server_adr.sin_port=htons(atoi(port)); //포트 할당
 	server_adr.sin_addr.s_addr=htonl(INADDR_ANY); //IP주소 할당
-
+	
+	
 	error_check(bind(server_fd, (struct sockaddr *)&server_adr,sizeof(server_adr)), "소켓주소 할당"); //주소 바인딩
 	error_check(listen(server_fd, BACKLOG), "연결요청 대기");
 
-	client_adr_size=sizeof(client_adr);
+	
+	while (1){
+		client_adr_size=sizeof(client_adr);
+		client_fd=accept(server_fd, (struct sockaddr *)&client_adr, &client_adr_size); //특정 클라이언트와 데이터 송수신용 TCP소켓 생성
+		printf("* %s:%d의 연결요청\n", inet_ntoa(client_adr.sin_addr), ntohs(client_adr.sin_port));
+		error_check(client_fd, "연결요청 승인");
+		
+		clnt_buf[clnt_count % CLNT_BUF_SIZE] = client_fd;
+		clnt_count ++;
+		clnt_real_count ++;
+		// user over 2 waiting
+		if(clnt_real_count >= 2){
+			if( pid != 0 )pid = fork();
+		
+			// child_process
+			if (pid == 0){
+				close(server_fd);
+				child_clnt_buf[0] = clnt_buf[clnt_count - 2];
+				child_clnt_buf[1] = clnt_buf[clnt_count - 1];
+				
+				test = 1;
+				for (int i = 0; i < 2 ; i ++){
+				//	write(child_clnt_buf[i], "connect with other clinet\n", 28);
+					pthread_create(&t_id[i], NULL, client_game_init2 , (void *) &child_clnt_buf[i]);
+					sleep(1);
+					test ++ ;
+				}
+				pthread_join(t_id[0], NULL);
+				pthread_join(t_id[1], NULL);
+			}
+			
+			// parent_process
+			if (pid > 0){
+				close(clnt_buf[clnt_count - 2]);
+				close(clnt_buf[clnt_count - 1]);
+				clnt_real_count -= 2;
+			}
+			
+			// fork error
+			else{
+				perror("fork");
+				exit(1);
+			}
+		}
 
-	client_fd=accept(server_fd, (struct sockaddr *)&client_adr, &client_adr_size); //특정 클라이언트와 데이터 송수신용 TCP소켓 생성
-	printf("* %s:%d의 연결요청\n", inet_ntoa(client_adr.sin_addr), ntohs(client_adr.sin_port));
-	error_check(client_fd, "연결요청 승인");
+	}	
+	
 }
+
+void* handle_clnt(void * arg){
+	int clnt = *((int *) arg);
+	int str_len = 0;
+	char msg [256];
+	char num[3];
+	while((str_len = read(clnt, msg, sizeof(msg))) != 0){
+		if (msg[0] == '='){
+			printf("optional \n");
+			
+	
+			num[0] = msg[1];
+			num[1] = msg[2];
+			num[2] = '\0';
+
+			for (int i = 0; i < 2 ; i ++){
+				write(child_clnt_buf[i], num, 3);
+			}
+		}
+		else{
+			for (int i = 0; i < 2 ; i ++){
+				write(child_clnt_buf[i], msg, sizeof(msg));
+			}
+		}
+	}
+}
+
+
 void error_check(int validation, char* message)
 {
 	if(validation==-1)
@@ -198,7 +285,7 @@ void client_game_init()
 	int check_number[BOARD_SIZE*BOARD_SIZE]={0};
 	int i, j;
 	int array_len;
-
+	
 	srand(time(NULL)+100); //서버 보드판과 다르게 하기위해 100을 추가
 
 	for(i=0; i < BOARD_SIZE; i++)
@@ -226,6 +313,108 @@ void client_game_init()
 	array_len=write(client_fd, turn_order, sizeof(turn_order));
 	printf("%d 바이트를 전송하였습니다\n", array_len);
 	error_check(array_len, "데이터전송");
+}
+void* client_game_init2(void * arg)
+{
+	int check_number[BOARD_SIZE*BOARD_SIZE]={0};
+	int i, j;
+	int array_len;
+	int clnt = *((int *) arg);
+	int my_num;
+	my_num=test;
+
+//	write(child_clnt_buf[i], msg, sizeof(msg));	
+//	srand(time(NULL)+(i*100)); //서버 보드판과 다르게 하기위해 100을 추가
+	
+	
+	srand(time(NULL)+100);
+	for(i=0; i < BOARD_SIZE; i++)
+	{
+		for(j=0; j < BOARD_SIZE; j++)
+		{
+			while(1)
+			{
+				int temp = rand()%25; //0~24 난수 발생
+			
+				if(check_number[temp]==0) //중복제거 알고리즘
+				{
+					check_number[temp]=1;
+					client_board[i][j]=temp+1;
+					break;
+				}
+			}
+		}
+	}    
+		array_len=write(clnt, client_board, sizeof(client_board));
+		printf("%d 바이트를 전송하였습니다\n", array_len);
+		error_check(array_len, "데이터전송");
+		turn_order[0] = test;
+		array_len=write(clnt, turn_order, sizeof(turn_order));
+		printf("%d 바이트를 전송하였습니다\n", array_len);
+		error_check(array_len, "데이터전송");
+//	}
+	//--------------------------------------------
+	int recv_len=0;//, array_len;
+	int recv_count;
+	while(1){
+		if (my_num==1){
+			while(recv_len!=sizeof(turn)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
+			{
+				recv_count=read(clnt, turn, sizeof(turn));
+				error_check(recv_count, "데이터수신");
+				if(recv_count==0) break;
+				printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
+				recv_len+=recv_count;
+			}
+			array_len=write(child_clnt_buf[1], turn, sizeof(turn));
+			printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
+			error_check(array_len, "데이터전송");	
+		}	
+		else{
+			while(recv_len!=sizeof(turn)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
+			{
+				recv_count=read(clnt, turn, sizeof(turn));
+				error_check(recv_count, "데이터수신");
+				if(recv_count==0) break;
+				printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
+				recv_len+=recv_count;
+			}
+			array_len=write(child_clnt_buf[0], turn, sizeof(turn));
+			printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
+			error_check(array_len, "데이터전송");
+		}
+		recv_len=0;
+	}
+	
+	/*
+	for(i=1;i<=BOARD_SIZE*BOARD_SIZE;i++)
+	{
+		if(i%2==1)
+			client_turn();
+		else
+		{
+			server_turn();
+		}
+
+	//	game_print(i);
+		for(j=0;j<4;j++) printf("turn[%d]=%d\n", j, turn[j]); //디버깅용
+		if(turn[3]==1)
+		{
+			printf("클라이언트 승리\n");
+			break;
+		}
+		else if(turn[3]==2)
+		{
+			printf("서버 승리\n");
+			break;
+		}
+		else if(turn[3]==3)
+		{
+			printf("무승부\n");
+			break;
+		}
+	}*/
+	
 }
 void game_print(int turn_count)
 {
@@ -329,6 +518,8 @@ void client_turn()
 	printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
 	error_check(array_len, "데이터전송");
 }
+
+
 void game_run()
 {
 	board_X(server_board, turn[0]);

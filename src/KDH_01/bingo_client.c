@@ -22,6 +22,7 @@ int turn[4] -> int turn[5] 로 바꾸고  turn[4]=클라이언트 index( 1번부
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <stdbool.h>
 #define BOARD_SIZE 5
 
 void socket_settings(char *ip, char *port); //소켓의 세팅
@@ -31,17 +32,18 @@ void game_init(); //빙고판 생성
 void game_print(int number, int turn_count); //게임진행
 void server_turn(); //서버 차례
 void client_turn(int turn_count); //클라이언트 차례
-
+bool check_winner();
+void send_winner();
+int bingo_check(int board[][BOARD_SIZE]);
 int board[BOARD_SIZE][BOARD_SIZE]; //보드판 배열
 int check_number[BOARD_SIZE*BOARD_SIZE+1]={0}; //중복검사용 배열
 int socket_fd; //소켓 파일디스크립터
-int turn[5]; //어플리케이션 프로토콜 정의
+int turn[4]; //어플리케이션 프로토콜 정의
 /*
 	turn[0]=플레이어 숫자선택
-	turn[1]=클라이언트 빙고 수
-	turn[2]=서버 빙고 수
+	turn[1]=클라이언트 빙고 수 (선공 빙고수)
+	turn[2]=서버 빙고 수	(후공 빙고 수)
 	turn[3]=게임종료여부(0=진행중, 1=클라이언트 승리, 2=서버 승리, 3=무승부)
-	turn[4]=클라이언트 index
 
 */
 int turn_order[1]; // 
@@ -61,28 +63,59 @@ void main(int argc, char *argv[])
 
 	socket_settings(argv[1], argv[2]);
 
-	printf("빙고게임을 시작합니다.\n");
+	printf("대전 상대를 기다리고 있습니다.\n");
 	game_init();
+	
 	game_print(0, 0);
 	
 	for(i=1;i<BOARD_SIZE*BOARD_SIZE;i++)
 	{
+		
+		/*
 		if(i%2==1)
 			client_turn(i);
 		else
 			server_turn();
-
+		*/
+		if (turn_order[0]==1){
+			if(i%2==1){
+				client_turn(i);
+				
+			}
+			else{
+				server_turn();		
+				if(check_winner()){ //선공이 값을 받고나서 승자 확인후, 승자를 뿌림
+					send_winner();
+				}
+			}
+		}
+		
+		else{
+			if(i%2==1){
+				server_turn();
+			}
+			else{
+				client_turn(i);	
+			}
+		}
 		game_print(turn[0], i);
-		//for(j=0;j<4;j++) printf("turn[%d]=%d\n", j, turn[j]); //디버깅용
-
+		for(j=0;j<4;j++) printf("turn[%d]=%d\n", j, turn[j]); //디버깅용
+		
+		
 		if(turn[3]==1)
 		{
-			printf("클라이언트 승리\n");
+			if (turn_order[0] == 1) //선공이면
+				printf("당신은 승리하셨습니다.\n");
+			else //후공이면
+				printf("당신은 패배하셨습니다.\n");
 			break;
 		}
 		else if(turn[3]==2)
 		{
-			printf("서버 승리\n");
+			if (turn_order[0] == 1) //선공이면
+				printf("당신은 패배하셨습니다.\n");
+			else //후공이면
+				printf("당신은 승리하셨습니다.\n");
 			break;
 		}
 		else if(turn[3]==3)
@@ -152,7 +185,7 @@ void game_init()
 		recv_count=read(socket_fd,turn_order, sizeof(turn_order));
 		error_check(recv_count, "데이터수신");
 		if(recv_count==-0) break;
-		printf("%d 바이트: board를 수신하였습니다\n", recv_count);
+		printf("%d 바이트: Turn_order 수신하였습니다\n", recv_count);
 		recv_len+=recv_count;
 	}
 }
@@ -170,8 +203,6 @@ void game_print(int number, int turn_count)
 	{
 		for(j=0; j < BOARD_SIZE; j++)
 		{
-			if(board[i][j]==number)
-				board[i][j]=0; //X표 처리
 			if(board[i][j]==0)
 			{
 				printf("| ");
@@ -199,7 +230,6 @@ void server_turn()
 	while(recv_len!=sizeof(turn)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
 	{
 		int recv_count;
-
 		recv_count=read(socket_fd, turn, sizeof(turn));
 		error_check(recv_count, "데이터수신");
 		if(recv_count==0) break;
@@ -207,20 +237,22 @@ void server_turn()
 		recv_len+=recv_count;
 	}
 	check_number[turn[0]]=1;
+	turn[turn_order[0]]=bingo_check(board);
+
 }
 void client_turn(int turn_count)
 {
-	int array_len, recv_len=0;
+	int array_len, recv_len=0;	
 	
+//	if (turn[3]==2 && turn_order[0]==2) //후공인대, 후공승리가 이미 정해졌으면
 	printf("%d턴 숫자를 입력해주세요 : ", turn_count);
 	scanf("%d", &turn[0]);
 	turn[0]=value_check(turn[0]);
-	check_number[turn[0]]=1;
-	
+	turn[turn_order[0]]=bingo_check(board); //빙고확인
 	array_len=write(socket_fd, turn, sizeof(turn));
 	printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
 	error_check(array_len, "데이터전송");
-
+	/*
 	while(recv_len!=sizeof(turn))
 	{
 		int recv_count;
@@ -230,5 +262,61 @@ void client_turn(int turn_count)
 		if(recv_count==0) break;
 		printf("%d 바이트: 서버의 턴 정보를 수신하였습니다\n", recv_count);
 		recv_len+=recv_count;
+	}*/
+}
+void send_winner()
+{
+	int array_len, recv_len=0;	
+	array_len=write(socket_fd, turn, sizeof(turn));
+	printf("%d 바이트: 클라이언트의 승리 정보를 전송하였습니다\n", array_len);
+	error_check(array_len, "데이터전송");
+
+}
+int bingo_check(int board[][BOARD_SIZE])
+{
+	int i,j;
+	int count=0;
+	
+	for(i=0; i < BOARD_SIZE; i++)
+	{
+		for(j=0; j < BOARD_SIZE; j++)
+		{
+			if(board[i][j]==turn[0])
+				board[i][j]=0; //X표 처리
+		}
+	}   
+	
+	for(i=0; i < BOARD_SIZE; i++) //가로
+	{
+		if(board[i][0]==0&&board[i][1]==0&&board[i][2]==0&&board[i][3]==0&&board[i][4]==0) //가로
+		{
+			count++;
+		}
+		if(board[0][i]==0&&board[1][i]==0&&board[2][i]==0&&board[3][i]==0&&board[4][i]==0) //세로
+			count++;
 	}
+	if(board[0][0]==0&&board[1][1]==0&&board[2][2]==0&&board[3][3]==0&&board[4][4]==0)
+		count++;
+	if(board[0][4]==0&&board[1][3]==0&&board[2][2]==0&&board[3][1]==0&&board[4][0]==0)
+		count++;
+	return count;
+}
+bool check_winner()
+{
+	if(turn[1]>=5&&turn[2]>=5){
+		turn[3]=3; //무승부
+		return true;
+	//	printf("무승부 입니다.");
+	}
+	else if(turn[1]>=5){
+		turn[3]=1; //선공 승리
+		return true;
+	//	printf("당신은 승리하셨습니다.");
+	}
+	else if(turn[2]>=5){
+		turn[3]=2; //후공 승리
+		return true;
+	//	printf("당신은 패배하셨습니다.");
+	}
+	return false;
 }

@@ -9,14 +9,9 @@
 
 void socket_settings(char *ip, char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
-int value_check(int number); //점수 유효값 검사
-void game_init(); //빙고판 생성
-void game_print(int number, int turn_count); //게임진행
-void server_turn(); //서버 차례
-void client_turn(int turn_count); //클라이언트 차례
-
-int board[BOARD_SIZE][BOARD_SIZE]; //보드판 배열
-int check_number[BOARD_SIZE*BOARD_SIZE+1]={0}; //중복검사용 배열
+void login();
+int menu();
+void sign_up();
 int socket_fd; //소켓 파일디스크립터
 char ID[30] , pwd[30]; //ID / PWD 저장 
 
@@ -31,7 +26,7 @@ int turn[4]; //어플리케이션 프로토콜 정의
 void main(int argc, char *argv[])
 {
 	int i, j;
-
+	int menu_value;
 	if(argc!=3)
 	{
 		printf("./실행파일 IP주소 PORT번호 형식으로 실행해야 합니다.\n");
@@ -42,68 +37,20 @@ void main(int argc, char *argv[])
 
 	system("clear");
 	
+	menu_value =menu();
 	
-	int lens;
-
-	printf("서버 접속을 성공했습니다!!\n");
-	printf("=======================\n");
-	
-	printf("ID를 입력하시오 : ");
-	scanf("%s",ID);
-	lens = write(socket_fd, ID, sizeof(ID));
-	error_check(lens, "로그인 데이터 쓰기");
-	printf("PWD를 입력하시오 : ");
-	scanf("%s" , pwd);
-	lens = write(socket_fd , pwd , sizeof(pwd));
-	error_check(lens, "비밀 번호 데이터 쓰기");
-
-	//연결완료후 로그인 
-	char flag; //login error 0, in 1
-
-	lens = read(socket_fd, flag , sizeof(flag));
-	error_check(lens , "로그인 확인 결과");
-	printf("%c\n",flag);
-	if(flag =='1' )
-		printf("로그인 성공\n");
-	else{
-		printf("로그인 실패\n");
-		exit(1);
-	}
-
-	
+	if(menu_value == 1)
+		login();
+	else if (menu_value == 2)
+		sign_up();
+	else
+		printf("메뉴 설정 에러 \n");
+	printf("정상 종료\n");
+	exit(1);
 	printf("빙고게임을 시작합니다.\n");
-	game_init();
-	game_print(0, 0);
+
 	
-	for(i=1;i<BOARD_SIZE*BOARD_SIZE;i++)
-	{
-		if(i%2==1)
-			client_turn(i);
-		else
-			server_turn();
 
-		game_print(turn[0], i);
-		//for(j=0;j<4;j++) printf("turn[%d]=%d\n", j, turn[j]); //디버깅용
-
-		if(turn[3]==1)
-		{
-			printf("클라이언트 승리\n");
-			break;
-		}
-		else if(turn[3]==2)
-		{
-			printf("서버 승리\n");
-			break;
-		}
-		else if(turn[3]==3)
-		{
-			printf("무승부\n");
-			break;
-		}
-	}
-	close(socket_fd);
-
-	printf("빙고게임을 종료합니다\n");
 }
 void socket_settings(char *ip, char *port)
 {
@@ -131,104 +78,101 @@ void error_check(int validation, char* message)
 		fprintf(stdout, "%s 완료\n", message);
 	}
 }
-int value_check(int number) //점수 유효값 검사
+int menu()
 {
-	if(number<1||number>25||check_number[number]==1)
-	{
-		printf("값이 유효하지 않습니다. 다시입력해주세요 : ");
-		scanf("%d", &number);
-		number=value_check(number); //유효값 입력할때까지 재귀호출
-	}
-	return number;
-}
-void game_init()
-{
-	int i, j; //카운트용 변수
-	int recv_len, recv_count;
-
-	recv_len=0;
-	while(recv_len!=sizeof(board)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
-	{
-		recv_count=read(socket_fd, board, sizeof(board));
-		error_check(recv_count, "데이터수신");
-		if(recv_count==-0) break;
-		printf("%d 바이트: board를 수신하였습니다\n", recv_count);
-		recv_len+=recv_count;
-	}
-}
-void game_print(int number, int turn_count)
-{
-	int i, j;
-
-	system("clear"); //동적 효과를 위한 화면 초기화
-	printf("%c[1;33m",27); //터미널 글자색을 노랑색으로 변경
+	int value;//사용자 입력
+	int c;//숫자 확인 
+	char send[1];//보낼 문자열
+	int lens;
+	printf("서버 접속을 성공했습니다!!\n");
 	
-	printf("@------ 클라 빙고판 ------@\n");
-	printf("진행 턴수: %d\n", turn_count); 
-	printf("+----+----+----+----+----+\n"); 
-	for(i=0; i < BOARD_SIZE; i++)
-	{
-		for(j=0; j < BOARD_SIZE; j++)
+	while(1){
+		
+		printf("1번 입력시 로그인 \n2번 입력시 회원 가입\n");
+		//scanf("%d",&value );
+		
+		if (!scanf("%d",&value ))
 		{
-			if(board[i][j]==number)
-				board[i][j]=0; //X표 처리
-			if(board[i][j]==0)
-			{
-				printf("| ");
-				printf("%c[1;31m",27);
-				printf("%2c ", 88); 
-				printf("%c[1;33m",27);
-			}
-			else
-				printf("| %2d ", board[i][j]); 
+			printf("숫자를 입력해야 됩니다.\n");
+			while(c=getchar()!='\n'&& c!=EOF );//버퍼에 남은 값 삭제
 		}
-		printf("|\n");
-		printf("+----+----+----+----+----+\n"); 
-	}      
-	printf("%c[0m", 27); //터미널 글자색을 원래색으로 변경
-	if(turn_count!=0)
-	{
-		printf("숫자: %d\n", turn[0]);
-		printf("빙고수: %d\n", turn[1]);
+		else if((value ==1)||(value ==2))
+			break;
+		else 
+			printf("올바른 숫자를 입력하시오\n");
+		
 	}
-}
-void server_turn()
-{
-	int recv_len=0;
-
-	while(recv_len!=sizeof(turn)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
-	{
-		int recv_count;
-
-		recv_count=read(socket_fd, turn, sizeof(turn));
-		error_check(recv_count, "데이터수신");
-		if(recv_count==0) break;
-		printf("%d 바이트: 서버의 턴 정보를 수신하였습니다\n", recv_count);
-		recv_len+=recv_count;
-	}
-	check_number[turn[0]]=1;
-}
-void client_turn(int turn_count)
-{
-	int array_len, recv_len=0;;
-
-	printf("%d턴 숫자를 입력해주세요 : ", turn_count);
-	scanf("%d", &turn[0]);
-	turn[0]=value_check(turn[0]);
-	check_number[turn[0]]=1;
+	if(value ==1)
+		send[0]='1';//숫자를 문자열로 바꾸어야 한다. 
+	else if(value ==2)
+		send[0]='2';
 	
-	array_len=write(socket_fd, turn, sizeof(turn));
-	printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
-	error_check(array_len, "데이터전송");
+	
+	printf("%s\n", send); 
+	lens = write(socket_fd, send, sizeof(send));
+	
+	error_check(lens , "사용자 메뉴 입력 보내기");
+	return value;
+}
+void login()
+{
+	int lens;
+	
+	system("clear");
+	//printf("서버 접속을 성공했습니다!!\n");
+	printf("=======================\n");
+	
+	printf("ID를 입력하시오 : ");
+	scanf("%s",ID);
+	lens = write(socket_fd, ID, sizeof(ID));
+	error_check(lens, "로그인 데이터 쓰기");
+	printf("PWD를 입력하시오 : ");
+	scanf("%s" , pwd);
+	lens = write(socket_fd , pwd , sizeof(pwd));
+	error_check(lens, "비밀 번호 데이터 쓰기");
 
-	while(recv_len!=sizeof(turn))
-	{
-		int recv_count;
+	
+	
+	printf("로그인 확인 중 입니다.\n");
+	//sleep(1);
+	//연결완료후 로그인 
+	char flag[1]; //login error 0, in 1
 
-		recv_count=read(socket_fd, turn, sizeof(turn));
-		error_check(recv_count, "데이터수신");
-		if(recv_count==0) break;
-		printf("%d 바이트: 서버의 턴 정보를 수신하였습니다\n", recv_count);
-		recv_len+=recv_count;
+	while(1){
+		if(sizeof(flag)==sizeof(char))
+		{
+			lens = read(socket_fd, flag , sizeof(flag));
+			break;
+		}
 	}
+	error_check(lens , "로그인 확인 결과");
+	printf("%s\n",flag);
+	
+	if(flag[0] =='1' )
+		printf("로그인 성공\n");
+	else{
+		printf("로그인 실패\n");
+		
+	}
+
+}
+void sign_up()
+{
+	int lens;
+	system("clear");
+	//printf("서버 접속을 성공했습니다!!\n");
+	printf("===========================\n");
+	printf("=========회원가입 과정=======\n");
+	printf("ID를 입력하시오 : \n");
+	scanf("%s",ID);
+	lens = write(socket_fd, ID, sizeof(ID));
+	error_check(lens, "회원가입 아이디 데이터 쓰기");
+	
+	printf("PAWORD를 입력해 주세요 \n");
+	scanf("%s",pwd);
+	lens = write(socket_fd , pwd , sizeof(pwd));
+	error_check(lens, "회원가입 비밀번호 데이터 쓰기");
+	
+	
+	
 }
