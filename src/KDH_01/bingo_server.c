@@ -6,6 +6,11 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <pthread.h> //-
+
+#include <signal.h>
+#include <sys/types.h> 
+#include <sys/wait.h>
+
 #define BOARD_SIZE 5
 #define BACKLOG 3 //연결대기 큐 숫자
 #define CLNT_BUF_SIZE 256 //-
@@ -14,6 +19,7 @@ void socket_settings(char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
 void client_game_init(); //클라이언트 빙고판 생성
 void * client_game_init2(void * arg);
+void force_quit_check(int turn[0]);
 
 int server_board[BOARD_SIZE][BOARD_SIZE]; //서버 보드판 배열
 int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
@@ -37,7 +43,7 @@ int turn[4]; //어플리케이션 프로토콜 정의
 	turn[3]=게임종료여부(0=진행중, 1=클라이언트 승리, 2=서버 승리, 3=무승부)
 
 */
-int turn_order[1]; // 
+int turn_order[1]; //선 턴 후턴 보내줌  
 /*
 	turn_order[0]=턴 순서 1=선공, 2=후공
 */
@@ -59,6 +65,12 @@ void main(int argc, char *argv[])
 void socket_settings(char *port)
 {
 	struct sockaddr_in server_adr, client_adr;
+	// struct sigaction sa; //시그널 관련 코드 시작
+	// sa.sa_handler = handler; 
+	// sa.sa_flags = SA_NODEFER | SA_NOCLDWAIT;
+	// sigemptyset(&sa.sa_mask); 
+	// sa.sa_restorer = NULL; sigaction(SIGCHLD, &sa, NULL); // 시그널 관련 코드 종료
+
 	socklen_t client_adr_size;
 	pid_t pid = 1;
 	pthread_mutex_init(&mutx, NULL);
@@ -109,7 +121,7 @@ void socket_settings(char *port)
 			
 			// parent_process
 			if (pid > 0){
-				close(clnt_buf[clnt_count - 2]);
+				close(clnt_buf[clnt_count - 2]); 
 				close(clnt_buf[clnt_count - 1]);
 				clnt_real_count -= 2;
 			}
@@ -125,6 +137,9 @@ void socket_settings(char *port)
 	
 }
 
+// void handler(int sig) { // 	SIGCHLD 처리 
+// 	while (waitpid(-1, NULL, WNOHANG) > 0);
+// }
 
 
 void error_check(int validation, char* message)
@@ -215,4 +230,8 @@ void* client_game_init2(void * arg)
 	
 }
 
+void force_quit_check(int turn[0]){
+	if (turn[0]<1 && 25<turn[0])
+		sleep(10);
+}
 

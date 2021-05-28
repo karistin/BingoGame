@@ -46,7 +46,10 @@ client_game_init 함수 부분 아래에 해당 내용 추가
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/wait.h>
 #include <pthread.h> //-
+#include <signal.h>
 #define BOARD_SIZE 5
 #define BACKLOG 3 //연결대기 큐 숫자
 #define CLNT_BUF_SIZE 256 //-
@@ -67,6 +70,7 @@ void game_run(); //게임 진행 및 승리여부 체크
 int bingo_check(int board[][BOARD_SIZE]); //빙고 줄 검사, 게임 종료조건 검사
 void* send_msg(void* arg);
 void* rcv_msg(void* arg);
+void read_childproc(int sig);
 
 int server_board[BOARD_SIZE][BOARD_SIZE]; //서버 보드판 배열
 int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
@@ -107,8 +111,6 @@ void main(int argc, char *argv[])
 		exit(1);
 	}
 
-	
-	
 	socket_settings(argv[1]);
 	printf("빙고게임을 시작합니다.\n");
 	
@@ -157,6 +159,8 @@ void socket_settings(char *port)
 	struct sockaddr_in server_adr, client_adr;
 	socklen_t client_adr_size;
 	pid_t pid = 1;
+	void * thread_return;
+	
 	pthread_mutex_init(&mutx, NULL);
 	server_fd=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //TCP 소켓 생성
 	error_check(server_fd, "소켓 생성");
@@ -198,8 +202,8 @@ void socket_settings(char *port)
 					sleep(1);
 					test ++ ;
 				}
-				pthread_join(t_id[0], NULL);
-				pthread_join(t_id[1], NULL);
+				pthread_join(t_id[0],&thread_return);
+				pthread_join(t_id[1],&thread_return);
 			}
 			
 			// parent_process
@@ -539,97 +543,13 @@ void game_run()
 		turn[3]=2; //서버 승리
 }
 
-void * recv_msg(void * arg)   // recv thread main
+void read_childproc(int sig)
 {
-              char come_msg[BUF_SIZE];
-	char temp[3];
-	int str_len;
-	int number;
-	while(1) 
+	int status;
+	pid_t id=waitpid(-1, &status, WNOHANG);
+	if(WIFEXITED(status))
 	{
-		str_len=read(socket_fd,come_msg,BUF_SIZE-1);
-		if(str_len==-1)
-			return (void*)-1;
-		come_msg[str_len]=0;
-		
-		if(come_msg[0] == '='){
-			switch(sizeof(come_msg)){
-				case 2:
-				temp[0]= come_msg[1];
-				temp[1]='\0';
-				break;
-				
-				case 3:
-				temp[0]=come_msg[1];
-				temp[1]=come_msg[2];
-				temp[2]='\0';
-				break;
-			}
-			number = atoi(temp);
-			turn[0] = number;
-			turn[turn_order[0]]=bingo_check(board);
-			game_print(turn[0],0);
-		}
-		else{
-			fputs(come_msg,stdout);
-		}
+		printf("Removed proc id: %d \n", id);
+		printf("Child send: %d \n", WEXITSTATUS(status));
 	}
-	return NULL;
-}
-	
-void * send_msg(void * arg)   // send thread main
-{
-	char go_msg[BUF_SIZE];
-	char temp[3];
-	int number = 0;
-	while(1)
-	{
-		fgets(go_msg,BUF_SIZE,stdin);
-		if(go_msg[0]=='>'){
-			if(sizeof(go_msg)>3){
-				printf("다시 입력하세요 \n");
-				continue;
-			}
-			
-			if(sizeof(go_msg)==2){
-				if(isdigit(go_msg[1])){
-					temp[0] = go_msg[1];
-					temp[1] = '\0';
-				}
-				else{
-					printf("다시 입력하세요 \n");
-					continue;
-				}
-			}
-			
-			else if(sizeof(go_msg) == 3){
-				if((isdigit(go_msg[1])) && (isdigit(go_msg[2]))){
-					temp[0] = go_msg[1];
-					temp[1] = go_msg[2];
-					temp[2] = '\0';
-				}
-				else{
-					printf("다시 입력하세요 \n");
-					continue;
-				}
-			}
-			else{
-				printf("다시 입력하세요 \n");
-				continue;
-			}
-			
-			number = atoi(temp);
-			
-			if((number>=1)&&(number<=25)){
-				write(socket_fd,go_msg,strlen(go_msg));
-				turn[0]=number;
-				turn[turn_order[0]]=bingo_check(board);
-				game_print(turn[0],0);
-			}
-			else{
-				write(socket_fd,go_msg,strlen(go_msg));
-			}
-		}
-	}
-	return NULL;
 }

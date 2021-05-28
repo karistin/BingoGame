@@ -11,9 +11,12 @@
 void socket_settings(char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
 int get_account(FILE * fp);
+void print_account(int peo_num);
 void login();
 void menu();
 void sign_up(); 
+void write_ID_PWD(FILE * fp);
+
 
 int server_fd, client_fd; //소켓 파일디스크립터
 typedef struct people_information{
@@ -22,13 +25,13 @@ typedef struct people_information{
 }people_info;
 people_info people[100]; //최대 100명 구조체 배열 
 
-int peo_num=0;
+int peo_num;
 
 int fp;// ID , PWD 파일 디스크립터
 char ID[30] , pwd[30]; //ID , PWD 저장 
 int turn[4]; //어플리케이션 프로토콜 정의
 pid_t pid;//getpid 부모 넣기
-
+int status; // 좀비 종료 
 
 
 void main(int argc, char *argv[])
@@ -48,28 +51,22 @@ void main(int argc, char *argv[])
 	printf("account success\n");
 	
 
-	int idx = get_account(fp); // 데이터 접근 
+	peo_num = get_account(fp); // 데이터 접근 
+
+	print_account(peo_num);
+	
+	
 	pid = getpid();	
 	printf("부모 pid : %d\n" , pid);
 	
 	
-	//people[0].pwd[strlen(people[0].pwd) - 1] = '\0';//enter 개행 문자 제거
-	
-	
-    //읽은 내용이 잘 저장됐는지 출력
-    for (int i = 0; i < idx; i++) {
-		people[i].pwd[strlen(people[i].pwd) - 1] = '\0';
-        printf("%s %s\n", people[i].name, people[i].pwd);
-    }
-
-	peo_num = idx;
-
 	socket_settings(argv[1]);
 	
 	
 
 }
-int get_account(FILE * fp){		
+int get_account(FILE * fp) //data.txt에서 데이터를 읽어옴 
+{		
 	char buffer[1001],*token; 
  
     int i=0;
@@ -95,14 +92,19 @@ int get_account(FILE * fp){
 	fclose(fp); // 파일 닫기
 	return idx;
 }
-void socket_settings(char *port)
+void print_account(int peo_num) //data.txt에서 데이터 print
+{
+	for (int i = 0; i < peo_num; i++) {
+		people[i].pwd[strlen(people[i].pwd) - 1] = '\0';//enter 개행 문자 제거
+		//읽은 내용이 잘 저장됐는지 출력
+        printf("%s %s\n", people[i].name, people[i].pwd);
+    }
+}
+void socket_settings(char *port) //네트워크 연결 후 자식 포켓 
 {
 	struct sockaddr_in server_adr, client_adr;
 	socklen_t client_adr_size;
 
-	//pid_t pid; //2021-05-25
-	// pthread_mutex_init(&mutx, NULL);
-	
 	
 	server_fd=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //TCP 소켓 생성
 	error_check(server_fd, "소켓 생성");
@@ -122,14 +124,20 @@ void socket_settings(char *port)
 
 		client_fd=accept(server_fd, (struct sockaddr *)&client_adr, &client_adr_size); //특정 클라이언트와 데이터 송수신용 TCP소켓 생성
 		printf("* %s:%d의 연결요청\n", inet_ntoa(client_adr.sin_addr), ntohs(client_adr.sin_port));
-		//error_check(client_fd, "연결요청 승인");
-		if(client_fd ==-1)
-			continue;
-		else 
-			puts("새로운 사용자 접속");
+		error_check(client_fd, "연결요청 승인");
 		
-		if(pid != 0)
-			pid = fork();//부모
+		// if(client_fd ==-1)
+		// 	continue;
+		// else 
+		// 	puts("새로운 사용자 접속");
+		
+		if(pid != 0){
+			pid = fork();//부모	
+			// wait(&status);
+			// if(WIFEXITED(status))
+			// 	printf("좀비 종료 성공적 \n");
+			// 동기로 해서 서버가 멈추네 ㅋㅋㅋ
+		}
 		if(pid ==-1)
 		{
 			close(client_fd);
@@ -143,7 +151,7 @@ void socket_settings(char *port)
 		}
 	}
 }
-void error_check(int validation, char* message)
+void error_check(int validation, char* message) //에러 체크 
 {
 	if(validation==-1)
 	{
@@ -155,7 +163,7 @@ void error_check(int validation, char* message)
 		fprintf(stdout, "%s 완료\n", message);
 	}
 }
-void menu() //사용자가 정보를 선택함
+void menu() //사용자에게 물어봄 
 {
 	int lens;
 	char send[1];
@@ -175,6 +183,8 @@ void menu() //사용자가 정보를 선택함
 		sign_up();
 	else
 		printf("메뉴 에러");
+
+	exit(1);
 }
 void sign_up() // 사용자가 회원 가입 
 {
@@ -203,37 +213,58 @@ void sign_up() // 사용자가 회원 가입
 		}
 	}
 	
+	FILE* fp = fopen("data.txt","a");
+	if(fp == NULL)
+	 	printf("fail to read file");
+	printf("account success\n");
+	
+	
+	write_ID_PWD(fp); //ID와 PWD는 전역 변수 
+	
 	
 	printf("메모장에 데이터 작성 \n");
 	
-	
+
+	fclose(fp);
 	//waitpid(pid , &status , WNOHANG ); 
-	exit(1);
+	
 	
 	
 }
-
-void login()
+void write_ID_PWD(FILE * fp)//사용자의 정보 기록 
+{
+	fputs("\n", fp);
+	fputs(ID, fp);
+	fputs(" ", fp);
+	fputs(pwd , fp);
+}
+void login() // 사용자의 로그인 과정 
 {
 	int lens;
-		char flag[1];//login error 0, in 1
-		flag[0] ='0';
+	char flag[1];//login error 0, in 1
+	flag[0] ='0';
 		//연결완료후 로그인
 
-		lens = read(client_fd, ID, sizeof(ID));
+	lens = read(client_fd, ID, sizeof(ID));
 		//printf("%d",lens);
-		error_check(lens, "로그인 데이터 읽기");
+	error_check(lens, "로그인 데이터 읽기");
 
-		printf("ID : %s\n",ID);
-		lens = read(client_fd, pwd , sizeof(pwd));
-		error_check(lens , "비밀번호 쓰기");	
-		printf("PWD  : %s\n",pwd);
+	printf("ID : %s\n",ID);
+	lens = read(client_fd, pwd , sizeof(pwd));
+	error_check(lens , "비밀번호 쓰기");	
+	printf("PWD  : %s\n",pwd);
 
 		//printf("peo_num :%d\n",peo_num);
 		//id 확인 
-
-
-		//printf("%s\n",people[0].pwd);
+	FILE* fp = fopen("data.txt","rw");
+	if(fp == NULL)
+	 	printf("fail to read file");
+	printf("account success\n");
+	
+	peo_num = get_account(fp); 
+	print_account(peo_num);
+	
+	//printf("%s\n",people[0].pwd);
 		//printf("%d\n",strcmp(people[0].pwd,pwd));
 		//printf("%d\n",strcmp(people[1].pwd,pwd));
 	for(int i=0; i<peo_num; i++)
@@ -258,6 +289,6 @@ void login()
 	printf("================================\n");
 	lens = write(client_fd, flag, sizeof(flag));
 	error_check(lens , "로그인 결과 전송");
-	exit(1);
+	
 }
 

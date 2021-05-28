@@ -9,6 +9,7 @@
 #define BOARD_SIZE 5
 #define BACKLOG 3 //연결대기 큐 숫자
 #define CLNT_BUF_SIZE 256 //-
+#define MSG_SIZE 100
 
 void socket_settings(char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
@@ -41,6 +42,15 @@ int turn_order[1]; //
 /*
 	turn_order[0]=턴 순서 1=선공, 2=후공
 */
+
+
+
+typedef struct p_token{
+	int p_turn[4];
+	char p_msg[MSG_SIZE];
+} p_token;
+
+p_token p;
 
 void main(int argc, char *argv[])
 {
@@ -98,13 +108,15 @@ void socket_settings(char *port)
 				test = 1;
 				for (int i = 0; i < 2 ; i ++){
 				//	write(child_clnt_buf[i], "connect with other clinet\n", 28);
-					pthread_create(&t_id[i], NULL, client_game_init2 , (void *) &child_clnt_buf[i]);
+					pthread_create(&t_id[i], NULL, client_game_init2 , (void *) &child_clnt_buf);
 					sleep(1);
 					// mutex 해야됨 (동기화 문제 발생 가능)
 					test ++ ;
 				}
 				pthread_join(t_id[0], NULL);
 				pthread_join(t_id[1], NULL);
+				
+				return;
 			}
 			
 			// parent_process
@@ -146,9 +158,25 @@ void* client_game_init2(void * arg)
 	int check_number[BOARD_SIZE*BOARD_SIZE]={0};
 	int i, j;
 	int array_len;
-	int clnt = *((int *) arg);
+	int* clnt_buf = (int *) arg;
 	int my_num;
 	my_num=test;
+	
+	int my_clnt, other_clnt;
+	
+	if (my_num == 1){
+		my_clnt = clnt_buf[0];
+		other_clnt = clnt_buf[1];
+	}
+	
+	else if(my_num == 2){
+		my_clnt = clnt_buf[1];
+		other_clnt = clnt_buf[0];
+	}
+	
+	else{
+		printf("wrong my_num");
+	}
 
 //	write(child_clnt_buf[i], msg, sizeof(msg));	
 //	srand(time(NULL)+(i*100)); //서버 보드판과 다르게 하기위해 100을 추가
@@ -172,45 +200,31 @@ void* client_game_init2(void * arg)
 			}
 		}
 	}    
-		array_len=write(clnt, client_board, sizeof(client_board));
+		array_len=write(my_clnt, client_board, sizeof(client_board));
 		printf("%d 바이트를 전송하였습니다\n", array_len);
 		error_check(array_len, "데이터전송");
 		turn_order[0] = test;
-		array_len=write(clnt, turn_order, sizeof(turn_order));
+		array_len=write(my_clnt, turn_order, sizeof(turn_order));
 		printf("%d 바이트를 전송하였습니다\n", array_len);
 		error_check(array_len, "데이터전송");
-//	}
-	//--------------------------------------------
+
 	int recv_len=0;//, array_len;
 	int recv_count;
+	
+	
 	while(1){
-		if (my_num==1){
-			while(recv_len!=sizeof(turn)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
-			{
-				recv_count=read(clnt, turn, sizeof(turn));
-				error_check(recv_count, "데이터수신");
-				if(recv_count==0) break;
-				printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
-				recv_len+=recv_count;
-			}
-			array_len=write(child_clnt_buf[1], turn, sizeof(turn));
-			printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
-			error_check(array_len, "데이터전송");	
-		}	
-		else{
-			while(recv_len!=sizeof(turn)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
-			{
-				recv_count=read(clnt, turn, sizeof(turn));
-				error_check(recv_count, "데이터수신");
-				if(recv_count==0) break;
-				printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
-				recv_len+=recv_count;
-			}
-			array_len=write(child_clnt_buf[0], turn, sizeof(turn));
-			printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
-			error_check(array_len, "데이터전송");
+		while (recv_len != sizeof(p)){
+			recv_count=read(my_clnt, &p, sizeof(p));
+			error_check(recv_count, "데이터수신");
+			if(recv_count==0) break;
+			printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
+			recv_len+=recv_count;
 		}
-		recv_len=0;
+		
+		array_len=write(other_clnt, &p, sizeof(p));
+		printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
+		error_check(array_len, "데이터전송");
+		recv_len = 0;
 	}
 	
 }

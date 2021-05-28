@@ -23,6 +23,8 @@ int turn[4] -> int turn[5] 로 바꾸고  turn[4]=클라이언트 index( 1번부
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <stdbool.h>
+#include <sys/time.h>
+#include <sys/wait.h>
 #define BOARD_SIZE 5
 #define BUF_SIZE 100
 
@@ -62,7 +64,6 @@ void main(int argc, char *argv[])
 {
 	int i, j;
 	pthread_t snd_thread,rcv_thread;
-	void* thread_return;
 
 	if(argc!=3)
 	{
@@ -76,11 +77,6 @@ void main(int argc, char *argv[])
 	game_init();
 	
 	game_print(0, 0);
-	
-	pthread_create(&snd_thread, NULL, send_msg, (void*)&socket_fd);
-	pthread_create(&rcv_thread, NULL, recv_msg, (void*)&socket_fd);
-	pthread_join(snd_thread, &thread_return);
-	pthread_join(rcv_thread, &thread_return);
 	
 	for(i=1;i<BOARD_SIZE*BOARD_SIZE;i++)
 	{
@@ -334,99 +330,4 @@ bool check_winner()
 	//	printf("당신은 패배하셨습니다.");
 	}
 	return false;
-}
-
-void * recv_msg(void * arg)   // recv thread main
-{
-    char come_msg[BUF_SIZE];
-	char temp[3];
-	int str_len;
-	int number;
-	while(1) 
-	{
-		str_len=read(socket_fd,come_msg,BUF_SIZE-1);
-		if(str_len==-1)
-			return (void*)-1;
-		come_msg[str_len]=0;
-		
-		if(come_msg[0] == '='){
-			switch(sizeof(come_msg)){
-				case 2:
-				temp[0]= come_msg[1];
-				temp[1]='\0';
-				break;
-				
-				case 3:
-				temp[0]=come_msg[1];
-				temp[1]=come_msg[2];
-				temp[2]='\0';
-				break;
-			}
-			number = atoi(temp);
-			turn[0] = number;
-			turn[turn_order[0]]=bingo_check(board);
-			game_print(turn[0],0);
-		}
-		else{
-			fputs(come_msg,stdout);
-		}
-	}
-	return NULL;
-}
-	
-void * send_msg(void * arg)   // send thread main
-{
-	char go_msg[BUF_SIZE];
-	char temp[3];
-	int number = 0;
-	while(1)
-	{
-		fgets(go_msg,BUF_SIZE,stdin);
-		if(go_msg[0]=='>'){
-			if(sizeof(go_msg)>3){
-				printf("다시 입력하세요 \n");
-				continue;
-			}
-			
-			if(sizeof(go_msg)==2){
-				if(isdigit(go_msg[1])){
-					temp[0] = go_msg[1];
-					temp[1] = '\0';
-				}
-				else{
-					printf("다시 입력하세요 \n");
-					continue;
-				}
-			}
-			
-			else if(sizeof(go_msg) == 3){
-				if((isdigit(go_msg[1])) && (isdigit(go_msg[2]))){
-					temp[0] = go_msg[1];
-					temp[1] = go_msg[2];
-					temp[2] = '\0';
-				}
-				else{
-					printf("다시 입력하세요 \n");
-					continue;
-				}
-			}
-			else{
-				printf("다시 입력하세요 \n");
-				continue;
-			}
-			
-			number = atoi(temp);
-			
-			if((number>=1)&&(number<=25)){
-				write(socket_fd,go_msg,strlen(go_msg));
-				turn[0]=number;
-				turn[turn_order[0]]=bingo_check(board);
-				game_print(turn[0],0);
-			}
-			else{
-				write(socket_fd,go_msg,strlen(go_msg));
-			}
-		}
-	}
-	return NULL;
 }
