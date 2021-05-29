@@ -63,6 +63,7 @@ void main(int argc, char *argv[])
 	int i, j;
 int menu_value;
 	if(argc!=3)
+		
 	{
 		printf("./실행파일 IP주소 PORT번호 형식으로 실행해야 합니다.\n");
 		exit(1);
@@ -311,6 +312,8 @@ void * recv_msg(void * arg) // read thread main
 {
 	char temp[3];
 	int number = 0;
+	 char c;
+	  while(c=getchar()!='\n'&& c!=EOF );
     while(1)
     {
 		if (p.p_turn[3] != 0){
@@ -318,7 +321,7 @@ void * recv_msg(void * arg) // read thread main
 		}
 		printf(">>> ");
         fgets(p.p_msg, MSG_SIZE, stdin);
-		fflush(stdout);
+
 		// 옵션 사용시
 		if (p.p_msg[0] == '='){
 			

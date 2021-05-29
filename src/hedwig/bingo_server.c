@@ -21,6 +21,7 @@ void login();
 void *menu();
 void sign_up(); 
 void write_ID_PWD(FILE * fp);
+void *ginit();
 
 int server_board[BOARD_SIZE][BOARD_SIZE]; //서버 보드판 배열
 int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
@@ -65,7 +66,7 @@ int peo_num;
 //FILE *fp;
 char ID[30] , pwd[30]; //ID , PWD 저장 
 int turn[4]; //어플리케이션 프로토콜 정의
-pid_t pid;//getpid 부모 넣기
+pid_t pid = 1;//getpid 부모 넣기
 //int status; // 좀비 종료 
 char flag[1]; //로그인 데이터 저장 
 
@@ -109,49 +110,13 @@ void socket_settings(char *port)
 	error_check(listen(server_fd, BACKLOG), "연결요청 대기");
 	
 	int index_ = 0;
-	
+	pthread_t tmp;
+	pthread_create(&tmp, NULL, ginit, NULL);
 	while (1){
 		
 		// user over 2 waiting
-		if(clnt_real_count >= 2){
-			if( pid != 0 )pid = fork();
-		
-			// child_process
-			if (pid == 0){
-				close(server_fd);
-				child_clnt_buf[0] = clnt_buf[clnt_count - 2];
-				child_clnt_buf[1] = clnt_buf[clnt_count - 1];
-				
-				test = 1;
-				for (int i = 0; i < 2 ; i ++){
-				//	write(child_clnt_buf[i], "connect with other clinet\n", 28);
-					pthread_create(&t_id[i], NULL, client_game_init2 , (void *) &child_clnt_buf);
-					sleep(1);
-					// mutex 해야됨 (동기화 문제 발생 가능)
-					test ++ ;
-				}
-				pthread_join(t_id[0], NULL);
-				pthread_join(t_id[1], NULL);
-				
-				return;
-			}
-			
-			// parent_process
-			if (pid > 0){
-				close(clnt_buf[clnt_count - 2]);
-				close(clnt_buf[clnt_count - 1]);
-				clnt_real_count -= 2;
-			}
-			
-			// fork error
-			else{
-				perror("fork");
-				exit(1);
-			}
-		}
-		
 		client_adr_size=sizeof(client_adr);
-		client_fd=accept(server_fd, (struct sockaddr *)&client_adr, &client_adr_size); //특정 클라이언트와 데이터 송수신용 TCP소켓 생성
+		client_fd=accept(server_fd, (struct sockaddr *)&client_adr, &client_adr_size);
 		printf("* %s:%d의 연결요청\n", inet_ntoa(client_adr.sin_addr), ntohs(client_adr.sin_port));
 		error_check(client_fd, "연결요청 승인");
 		
@@ -186,6 +151,7 @@ void* client_game_init2(void * arg)
 	int array_len;
 	int* clnt_buf = (int *) arg;
 	int my_num;
+	printf("client game init 2 test : %d\n" , test);
 	my_num=test;
 	
 	int my_clnt, other_clnt;
@@ -246,6 +212,9 @@ void* client_game_init2(void * arg)
 			printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
 			recv_len+=recv_count;
 		}
+		
+		printf("%d, %d, %d, %d \n", p.p_turn[0], p.p_turn[1], p.p_turn[2], p.p_turn[3]);
+		printf("%s, \n", p.p_msg);
 		
 		array_len=write(other_clnt, &p, sizeof(p));
 		printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
@@ -326,6 +295,7 @@ void * menu(void* arg) //사용자에게 물어봄
 		
 		if(flag[0] =='1'){
 			printf("로그인 성공\n");
+			flag[0] = '0';
 			break;
 		}
 		
@@ -341,7 +311,7 @@ void sign_up(int clnt) // 사용자가 회원 가입
 	while(1){
 		if(sizeof(ID)==30)
 		{
-			lens = read(client_fd, ID, sizeof(ID));
+			lens = read(clnt, ID, sizeof(ID));
 			//printf("%d",lens);
 			error_check(lens, "회원가입 데이터 읽기");
 			printf("ID : %s\n",ID);
@@ -353,7 +323,7 @@ void sign_up(int clnt) // 사용자가 회원 가입
 	while(1){
 		if(sizeof(ID)==30)
 		{
-			lens = read(client_fd, pwd , sizeof(pwd));
+			lens = read(clnt, pwd , sizeof(pwd));
 			error_check(lens , "비밀번호 쓰기");	
 			printf("PWD  : %s\n",pwd);
 			break;
@@ -392,12 +362,12 @@ void login(int clnt) // 사용자의 로그인 과정
 	//flag[0] ='0';
 		//연결완료후 로그인
 
-	lens = read(client_fd, ID, sizeof(ID));
+	lens = read(clnt, ID, sizeof(ID));
 		//printf("%d",lens);
 	error_check(lens, "로그인 데이터 읽기");
 
 	printf("ID : %s\n",ID);
-	lens = read(client_fd, pwd , sizeof(pwd));
+	lens = read(clnt, pwd , sizeof(pwd));
 	error_check(lens , "비밀번호 쓰기");	
 	printf("PWD  : %s\n",pwd);
 
@@ -424,7 +394,7 @@ void login(int clnt) // 사용자의 로그인 과정
 					printf("아이디와 비밀번호 일치\n");
 					flag[0] ='1';
 					printf("================================\n");
-					lens = write(client_fd, flag, sizeof(flag));
+					lens = write(clnt, flag, sizeof(flag));
 					error_check(lens , "로그인 결과 전송");
 					//people[i].lg_in =1; 텍스트에 접근하여 고치기 
 					
@@ -454,3 +424,50 @@ void login(int clnt) // 사용자의 로그인 과정
 	
 }
 
+
+void *ginit(){
+	while(1){
+		
+		if(clnt_real_count >= 2){
+			printf("clnt_real_count : %d\n" , clnt_real_count);
+			if( pid != 0 )pid = fork();
+
+				// child_process
+			if (pid == 0){
+				//close(server_fd);
+				child_clnt_buf[0] = clnt_buf[clnt_count - 2];
+				child_clnt_buf[1] = clnt_buf[clnt_count - 1];
+
+				test = 1;
+				for (int i = 0; i < 2 ; i ++){
+				//	write(child_clnt_buf[i], "connect with other clinet\n", 28);
+						
+					//printf("client game init 2 test : %d\n" , test);
+					pthread_create(&t_id[i], NULL, client_game_init2 , (void *) &child_clnt_buf);
+					sleep(1);
+					// mutex 해야됨 (동기화 문제 발생 가능)
+					test ++ ;
+					
+				}
+				
+				pthread_join(t_id[0], NULL);
+				pthread_join(t_id[1], NULL);
+				return NULL;
+			}
+
+			// parent_process
+			if (pid > 0){
+				close(clnt_buf[clnt_count - 2]);
+				close(clnt_buf[clnt_count - 1]);
+				clnt_real_count -= 2;
+			}
+				// fork error
+			else{
+				perror("fork");
+				exit(1);
+			}
+		}
+	}
+	
+	return NULL;
+}
