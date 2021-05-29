@@ -27,7 +27,8 @@ people_info people[100]; //최대 100명 구조체 배열
 
 int peo_num;
 
-int fp;// ID , PWD 파일 디스크립터
+//int fp;// ID , PWD 파일 디스크립터
+//FILE *fp;
 char ID[30] , pwd[30]; //ID , PWD 저장 
 int turn[4]; //어플리케이션 프로토콜 정의
 pid_t pid;//getpid 부모 넣기
@@ -73,8 +74,8 @@ int get_account(FILE * fp) //data.txt에서 데이터를 읽어옴
     int idx = 0;
     while (!feof(fp)) {
         i = 0;//i초기화
-        fgets(buffer, 1001, fp); 
-        token = strtok(buffer, " "); // 
+        fgets(buffer, 1001, fp);//전부 읽어오기  
+        token = strtok(buffer, " "); // 스페이스 기준으로 짜르기 
         while (token != NULL) {
  
             if (i == 0) {
@@ -95,7 +96,8 @@ int get_account(FILE * fp) //data.txt에서 데이터를 읽어옴
 void print_account(int peo_num) //data.txt에서 데이터 print
 {
 	for (int i = 0; i < peo_num; i++) {
-		people[i].pwd[strlen(people[i].pwd) - 1] = '\0';//enter 개행 문자 제거
+		if(i<peo_num-2)
+			people[i].pwd[strlen(people[i].pwd) - 1] = '\0';//enter 개행 문자 제거
 		//읽은 내용이 잘 저장됐는지 출력
         printf("%s %s\n", people[i].name, people[i].pwd);
     }
@@ -137,6 +139,8 @@ void socket_settings(char *port) //네트워크 연결 후 자식 포켓
 			// if(WIFEXITED(status))
 			// 	printf("좀비 종료 성공적 \n");
 			// 동기로 해서 서버가 멈추네 ㅋㅋㅋ
+			
+			
 		}
 		if(pid ==-1)
 		{

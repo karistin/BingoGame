@@ -70,8 +70,6 @@ void game_run(); //게임 진행 및 승리여부 체크
 int bingo_check(int board[][BOARD_SIZE]); //빙고 줄 검사, 게임 종료조건 검사
 void* send_msg(void* arg);
 void* rcv_msg(void* arg);
-void read_childproc(int sig);
-
 int server_board[BOARD_SIZE][BOARD_SIZE]; //서버 보드판 배열
 int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
 int check_number[BOARD_SIZE*BOARD_SIZE+1]={0}; //중복검사용 배열
@@ -160,6 +158,7 @@ void socket_settings(char *port)
 	socklen_t client_adr_size;
 	pid_t pid = 1;
 	void * thread_return;
+	int status;
 	
 	pthread_mutex_init(&mutx, NULL);
 	server_fd=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //TCP 소켓 생성
@@ -173,8 +172,7 @@ void socket_settings(char *port)
 	
 	
 	error_check(bind(server_fd, (struct sockaddr *)&server_adr,sizeof(server_adr)), "소켓주소 할당"); //주소 바인딩
-	error_check(listen(server_fd, BACKLOG), "연결요청 대기");
-
+	error_check(listen(server_fd, BACKLOG), "연결요청 대기");	
 	
 	while (1){
 		client_adr_size=sizeof(client_adr);
@@ -188,7 +186,6 @@ void socket_settings(char *port)
 		// user over 2 waiting
 		if(clnt_real_count >= 2){
 			if( pid != 0 )pid = fork();
-		
 			// child_process
 			if (pid == 0){
 				close(server_fd);
@@ -208,8 +205,23 @@ void socket_settings(char *port)
 			
 			// parent_process
 			if (pid > 0){
-				close(clnt_buf[clnt_count - 2]);
-				close(clnt_buf[clnt_count - 1]);
+				// 좀비 프로세스 체크 및 소멸
+				pid_t waitPid;
+				waitPid = wait(&status);
+				
+				if(waitPid == -1){
+					perror("wait 함수 오류 반환");
+				}
+				else{
+					if(WIFEXITED(status)){
+						close(clnt_buf[clnt_count - 2]);
+				        close(clnt_buf[clnt_count - 1]);
+					}
+					else if(WIFSIGNALED(status)){
+						
+					}
+				}
+				
 				clnt_real_count -= 2;
 			}
 			
@@ -541,15 +553,4 @@ void game_run()
 		turn[3]=1; //클라이언트 승리
 	else if(turn[2]>=5)
 		turn[3]=2; //서버 승리
-}
-
-void read_childproc(int sig)
-{
-	int status;
-	pid_t id=waitpid(-1, &status, WNOHANG);
-	if(WIFEXITED(status))
-	{
-		printf("Removed proc id: %d \n", id);
-		printf("Child send: %d \n", WEXITSTATUS(status));
-	}
 }

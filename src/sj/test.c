@@ -2,11 +2,24 @@
 #include <stdlib.h>
 #include <string.h>  
 #include <arpa/inet.h>
-
+#include <signal.h>
 void print_msg();
 int a=6; // global 
+
+
+void read_childproc(int sig){
+	int status;
+	pid_t id = waitpid(-1, &status, WNOHANG);
+	
+	if (WIFEXITED(status)){
+		printf("kill\n");
+	}
+}
+
 int main ()
 {
+	
+	
 	// char a[20]="ksj";
 	// char b[20]="kakak";
 	// char c[20]="ksj";
@@ -76,27 +89,40 @@ int main ()
 	// //전역 변수는 포크시 만들어감 다만 내용의 변화는 서로 다르다. 
 	
 	pid_t pid;
+	
+	struct sigaction act;
+	act.sa_handler = read_childproc;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = 0;
+	
+	
 	printf("부모 PID : %d \n" ,getpid());
 	pid = fork();
 	
 	if(pid == 0)
 	{
+		
+		sleep(5);
 		printf("자식 PID %d\n" ,getpid());
-		sleep(10);
+		return 0;
 	}
 	
 	else 
 	{
-		//signal(SIGCHLD , print_msg());
-		// signal(SIGALRM , print_msg());
-		//printf("자식이 종료 되었습니다.\n");
+		printf("1\n");
+		sigaction(SIGCHLD, &act, 0);
+		printf("2\n");
+		printf("3\n");
+		//signal(SIGALRM , print_msg());
+		sleep(100);
+		
+		
 	}
-	
-	
-	return 0;
+
 }
 
 void print_msg()
 {
 	printf("자식이 종료되었습니다.");
+	
 }

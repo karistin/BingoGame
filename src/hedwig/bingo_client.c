@@ -39,6 +39,8 @@ int turn_order[1]; //
 */
 int now_turn = 0;
 
+int other_turn;
+
 pthread_t re_t, se_t;
 
 typedef struct p_token{
@@ -65,7 +67,13 @@ void main(int argc, char *argv[])
 	game_init();
 	now_turn = turn_order[0];
 	
+	if (turn_order[0] == 1){
+		other_turn = 2;
+	}
 	
+	else{
+		other_turn = 1;
+	}
 	
 	game_print(0, 1);
 	
@@ -166,7 +174,8 @@ void game_print(int number, int turn_count)
 	if(turn_count!=0)
 	{
 		printf("숫자: %d\n", p.p_turn[0]);
-		printf("빙고수: %d\n", p.p_turn[turn_order[0]]);
+		printf("나의 빙고수: %d\n", p.p_turn[turn_order[0]]);
+		printf("상대의 빙고수: %d\n", p.p_turn[other_turn]);
 	}
 }
 
@@ -240,6 +249,8 @@ void * recv_msg(void * arg) // read thread main
         str_len=read(socket_fd, &p, sizeof(p));
         if(str_len==-1)
         	return (void*)-1;
+		
+		
 
         p.p_msg[str_len]='\0';
 		  
@@ -257,6 +268,11 @@ void * recv_msg(void * arg) // read thread main
 		else{		  
         	fputs(p.p_msg, stdout);
 		}
+		
+		if (p.p_turn[other_turn] >= 5){
+			printf("defeat.... \n");
+			return NULL;
+		}
     }
     return NULL;
 }
@@ -269,6 +285,9 @@ void * recv_msg(void * arg) // read thread main
 	int number = 0;
     while(1)
     {
+		if (p.p_turn[3] != 0){
+			return NULL;
+		}
 		printf(">>> ");
         fgets(p.p_msg, MSG_SIZE, stdin);
 		fflush(stdout);
@@ -341,7 +360,6 @@ void * recv_msg(void * arg) // read thread main
 				printf("worng number try again \n");
 				continue;
 			}
-		
 		}
 	
 		else{
