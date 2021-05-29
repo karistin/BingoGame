@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <signal.h>
 
 #define BACKLOG 3 //연결대기 큐 숫자
 
@@ -22,6 +23,7 @@ int server_fd, client_fd; //소켓 파일디스크립터
 typedef struct people_information{
 	char name[30];
 	char pwd[30];
+	int lg_in;//1는 로그인중 0는 로그아웃 
 }people_info;
 people_info people[100]; //최대 100명 구조체 배열 
 
@@ -32,7 +34,8 @@ int peo_num;
 char ID[30] , pwd[30]; //ID , PWD 저장 
 int turn[4]; //어플리케이션 프로토콜 정의
 pid_t pid;//getpid 부모 넣기
-int status; // 좀비 종료 
+//int status; // 좀비 종료 
+char flag[1]; //로그인 데이터 저장 
 
 
 void main(int argc, char *argv[])
@@ -46,19 +49,29 @@ void main(int argc, char *argv[])
 
 	
 			
+	flag[0] ='0';
 	FILE* fp = fopen("data.txt","rw");
 	if(fp == NULL)
 	 	printf("fail to read file");
 	printf("account success\n");
 	
-
+	for (int i = 0; i < peo_num; i++){
+		people[i].lg_in =0;
+	}
+	
 	peo_num = get_account(fp); // 데이터 접근 
 
 	print_account(peo_num);
 	
+
+	
 	
 	pid = getpid();	
+
+
 	printf("부모 pid : %d\n" , pid);
+	
+	
 	
 	
 	socket_settings(argv[1]);
@@ -96,10 +109,10 @@ int get_account(FILE * fp) //data.txt에서 데이터를 읽어옴
 void print_account(int peo_num) //data.txt에서 데이터 print
 {
 	for (int i = 0; i < peo_num; i++) {
-		if(i<peo_num-2)
+		if(i<peo_num-1)
 			people[i].pwd[strlen(people[i].pwd) - 1] = '\0';//enter 개행 문자 제거
 		//읽은 내용이 잘 저장됐는지 출력
-        printf("%s %s\n", people[i].name, people[i].pwd);
+        printf("%s %s %d\n", people[i].name, people[i].pwd, people[i].lg_in);
     }
 }
 void socket_settings(char *port) //네트워크 연결 후 자식 포켓 
@@ -138,16 +151,13 @@ void socket_settings(char *port) //네트워크 연결 후 자식 포켓
 			// wait(&status);
 			// if(WIFEXITED(status))
 			// 	printf("좀비 종료 성공적 \n");
-			// 동기로 해서 서버가 멈추네 ㅋㅋㅋ
-			
-			
 		}
-		if(pid ==-1)
+		if(pid == -1)
 		{
 			close(client_fd);
 			continue;
 		}
-		if(pid ==0)
+		if(pid == 0)
 		{
 			close(server_fd);
 			menu();
@@ -169,25 +179,35 @@ void error_check(int validation, char* message) //에러 체크
 }
 void menu() //사용자에게 물어봄 
 {
-	int lens;
-	char send[1];
-	while(1){
-		if(sizeof(send)==sizeof(char))
-		{
-		lens = read(client_fd,send,sizeof(send));
-		error_check(lens , "사용자 메뉴 입력 읽기");
-		break;
-		}
-	}
-	printf("%s\n", send);
 	
-	if(send[0]=='1')
-		login();
-	else if(send[0]=='2')
-		sign_up();
-	else
-		printf("메뉴 에러");
-
+	while(1){
+		int lens;
+		char send[1];
+		while(1){
+			if(sizeof(send)==sizeof(char))
+			{
+			lens = read(client_fd,send,sizeof(send));
+			error_check(lens , "사용자 메뉴 입력 읽기");
+			break;
+			}
+		}
+		printf("%s\n", send);
+	
+		if(send[0]=='1')
+			login();
+		else if(send[0]=='2')
+			sign_up();
+		else
+			printf("메뉴 에러");
+		
+		if(flag[0] =='1'){
+			printf("로그인 성공\n");
+			break;
+		}
+		
+	}
+	
+	
 	exit(1);
 }
 void sign_up() // 사용자가 회원 가입 
@@ -245,8 +265,8 @@ void write_ID_PWD(FILE * fp)//사용자의 정보 기록
 void login() // 사용자의 로그인 과정 
 {
 	int lens;
-	char flag[1];//login error 0, in 1
-	flag[0] ='0';
+	//char flag[1];//login error 0, in 1
+	//flag[0] ='0';
 		//연결완료후 로그인
 
 	lens = read(client_fd, ID, sizeof(ID));
@@ -277,8 +297,13 @@ void login() // 사용자의 로그인 과정
 		{
 			if(strcmp(people[i].pwd , pwd) == 0)
 			{
-				printf("아이디와 비밀번호 일치\n");
-				flag[0] ='1';
+				if(people[i].lg_in == 0){
+					printf("아이디와 비밀번호 일치\n");
+					flag[0] ='1';
+					//people[i].lg_in =1; 텍스트에 접근하여 고치기 
+				}
+				else 
+					printf("접속중인 아이디 입니다.\n");
 			}
 			else
 			{
@@ -293,6 +318,8 @@ void login() // 사용자의 로그인 과정
 	printf("================================\n");
 	lens = write(client_fd, flag, sizeof(flag));
 	error_check(lens , "로그인 결과 전송");
+	
+
 	
 }
 

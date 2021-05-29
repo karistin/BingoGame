@@ -1,20 +1,3 @@
-/* 수정되거나 추가된 사항, 다른 프로젝트와 합칠 시 해당 부분 수정
-int turn_order[1]; // (턴 순서 1=선공, 2=후공) 전역 변수 선언문에 추가
------------------------------------------
-game_init 함수 내 아래쪽 해당 내용 추가
-recv_len=0;
-	while(recv_len!=sizeof(turn_order)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
-	{
-		recv_count=read(socket_fd,turn_order, sizeof(turn_order));
-		error_check(recv_count, "데이터수신");
-		if(recv_count==-0) break;
-		printf("%d 바이트: board를 수신하였습니다\n", recv_count);
-		recv_len+=recv_count;
-	} 
------------------------------------------
-int turn[4] -> int turn[5] 로 바꾸고  turn[4]=클라이언트 index( 1번부터 시작 )
------------------------------------------
-*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -23,8 +6,10 @@ int turn[4] -> int turn[5] 로 바꾸고  turn[4]=클라이언트 index( 1번부
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <stdbool.h>
-#define BOARD_SIZE 5
+#include <ctype.h>
 
+#define BOARD_SIZE 5
+#define MSG_SIZE 100
 void socket_settings(char *ip, char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
 int value_check(int number); //점수 유효값 검사
@@ -71,12 +56,6 @@ void main(int argc, char *argv[])
 	for(i=1;i<BOARD_SIZE*BOARD_SIZE;i++)
 	{
 		
-		/*
-		if(i%2==1)
-			client_turn(i);
-		else
-			server_turn();
-		*/
 		if (turn_order[0]==1){
 			if(i%2==1){
 				client_turn(i);
@@ -156,9 +135,11 @@ void error_check(int validation, char* message)
 }
 int value_check(int number) //점수 유효값 검사
 {
+	char c;
 	if(number<1||number>25||check_number[number]==1)
 	{
 		printf("값이 유효하지 않습니다. 다시입력해주세요 : ");
+		while(c=getchar()!='\n' && c!=EOF) { };
 		scanf("%d", &number);
 		number=value_check(number); //유효값 입력할때까지 재귀호출
 	}
@@ -230,6 +211,7 @@ void server_turn()
 	while(recv_len!=sizeof(turn)) // 패킷이 잘려서 올수도 있으므로 예외처리를 위한 조건문
 	{
 		int recv_count;
+
 		recv_count=read(socket_fd, turn, sizeof(turn));
 		error_check(recv_count, "데이터수신");
 		if(recv_count==0) break;
@@ -240,30 +222,24 @@ void server_turn()
 	turn[turn_order[0]]=bingo_check(board);
 
 }
+
+
 void client_turn(int turn_count)
 {
 	int array_len, recv_len=0;	
+	char* msg[MSG_SIZE];
 	
-//	if (turn[3]==2 && turn_order[0]==2) //후공인대, 후공승리가 이미 정해졌으면
 	printf("%d턴 숫자를 입력해주세요 : ", turn_count);
 	scanf("%d", &turn[0]);
+	
 	turn[0]=value_check(turn[0]);
 	turn[turn_order[0]]=bingo_check(board); //빙고확인
 	array_len=write(socket_fd, turn, sizeof(turn));
 	printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
 	error_check(array_len, "데이터전송");
-	/*
-	while(recv_len!=sizeof(turn))
-	{
-		int recv_count;
-
-		recv_count=read(socket_fd, turn, sizeof(turn));
-		error_check(recv_count, "데이터수신");
-		if(recv_count==0) break;
-		printf("%d 바이트: 서버의 턴 정보를 수신하였습니다\n", recv_count);
-		recv_len+=recv_count;
-	}*/
 }
+
+
 void send_winner()
 {
 	int array_len, recv_len=0;	
@@ -272,6 +248,7 @@ void send_winner()
 	error_check(array_len, "데이터전송");
 
 }
+
 int bingo_check(int board[][BOARD_SIZE])
 {
 	int i,j;
@@ -319,4 +296,106 @@ bool check_winner()
 	//	printf("당신은 패배하셨습니다.");
 	}
 	return false;
+}
+
+
+void * recv_msg(void * arg) // read thread main
+{
+	char name_msg[MSG_SIZE];
+    int str_len;
+	char temp[3];
+	int number;
+    while(1)
+    {
+        str_len=read(socket_fd, name_msg, MSG_SIZE - 1);
+        if(str_len==-1)
+            return (void*)-1;
+        name_msg[str_len]=0;
+		  
+		if (name_msg[0] == '='){
+			  
+			switch (sizeof(name_msg)){
+				  
+				case 2:
+					temp[0] = name_msg[1];
+					temp[1] = '\0';
+					break;
+				case 3:
+					temp[0] = name_msg[1];
+					temp[1] = name_msg[2];
+					temp[2] = '\0';
+					break;
+			}			
+			number = atoi(temp);
+			turn[0] = number;			
+			turn[turn_order[0]]=bingo_check(board);	
+			game_print(turn[0], 0);
+		}
+		else{		  
+        	fputs(name_msg, stdout);
+		}
+    }
+    return NULL;
+}
+
+
+
+ void * send_msg(void * arg)   // send thread main
+{
+    char name_msg[MSG_SIZE];
+	char temp[3];
+	int number = 0;
+    while(1)
+    {
+        fgets(name_msg, MSG_SIZE, stdin);
+		// 옵션 사용시
+		if (name_msg[0] == '='){
+			if (sizeof(name_msg) > 3){
+				printf("worng options try again \n");
+				continue;
+			}
+			
+			if (sizeof(name_msg) == 2){
+				if (isdigit(name_msg[1])){
+					temp[0] = name_msg[1];
+					temp[1] = '\0';
+				}
+				else{
+					printf("worng options try again \n");
+					continue;
+				}
+			}
+			
+			else if (sizeof(name_msg) == 3){
+				if ((isdigit(name_msg[1])) && (isdigit(name_msg[2]))){
+					temp[0] = name_msg[1];
+					temp[1] = name_msg[2];
+					temp[2] = '\0';
+				}
+				else{
+					printf("worng options try again \n");
+					continue;
+				}
+			}
+			else{
+				printf("worng options try again \n");
+				continue;
+			}
+			
+			number = atoi(temp);
+			
+			if ((number >= 1) && (number <= 25))
+				write(socket_fd, name_msg, strlen(name_msg));
+				turn[0] = number;			
+				turn[turn_order[0]]=bingo_check(board);	
+				game_print(turn[0], 0);
+		}
+		
+		else{
+			write(socket_fd, name_msg, strlen(name_msg));
+		}
+		 
+        
+    }
+    return NULL;
 }

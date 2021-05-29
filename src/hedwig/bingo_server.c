@@ -15,12 +15,19 @@ void socket_settings(char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
 void client_game_init(); //클라이언트 빙고판 생성
 void * client_game_init2(void * arg);
+int get_account(FILE * fp);
+void print_account(int peo_num);
+void login();
+void *menu();
+void sign_up(); 
+void write_ID_PWD(FILE * fp);
 
 int server_board[BOARD_SIZE][BOARD_SIZE]; //서버 보드판 배열
 int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
 int check_number[BOARD_SIZE*BOARD_SIZE+1]={0}; //중복검사용 배열
 int server_fd, client_fd; //소켓 파일디스크립터
 
+int login_buf[CLNT_BUF_SIZE];
 int clnt_buf [CLNT_BUF_SIZE];
 int clnt_count = 1;
 pthread_mutex_t mutx;
@@ -29,6 +36,7 @@ int clnt_real_count = 0;
 int test = 0; // test용 나중에 삭제해
 
 pthread_t t_id[2];
+pthread_t t_id_t;
 
 int turn[4]; //어플리케이션 프로토콜 정의
 /*
@@ -43,7 +51,23 @@ int turn_order[1]; //
 	turn_order[0]=턴 순서 1=선공, 2=후공
 */
 
+typedef struct people_information{
+	char name[30];
+	char pwd[30];
+	int lg_in;//1는 로그인중 0는 로그아웃 
+}people_info;
 
+people_info people[100]; //최대 100명 구조체 배열 
+
+int peo_num;
+
+//int fp;// ID , PWD 파일 디스크립터
+//FILE *fp;
+char ID[30] , pwd[30]; //ID , PWD 저장 
+int turn[4]; //어플리케이션 프로토콜 정의
+pid_t pid;//getpid 부모 넣기
+//int status; // 좀비 종료 
+char flag[1]; //로그인 데이터 저장 
 
 typedef struct p_token{
 	int p_turn[4];
@@ -70,8 +94,7 @@ void socket_settings(char *port)
 {
 	struct sockaddr_in server_adr, client_adr;
 	socklen_t client_adr_size;
-	pid_t pid = 1;
-	pthread_mutex_init(&mutx, NULL);
+
 	server_fd=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //TCP 소켓 생성
 	error_check(server_fd, "소켓 생성");
 
@@ -84,17 +107,11 @@ void socket_settings(char *port)
 	
 	error_check(bind(server_fd, (struct sockaddr *)&server_adr,sizeof(server_adr)), "소켓주소 할당"); //주소 바인딩
 	error_check(listen(server_fd, BACKLOG), "연결요청 대기");
-
+	
+	int index_ = 0;
 	
 	while (1){
-		client_adr_size=sizeof(client_adr);
-		client_fd=accept(server_fd, (struct sockaddr *)&client_adr, &client_adr_size); //특정 클라이언트와 데이터 송수신용 TCP소켓 생성
-		printf("* %s:%d의 연결요청\n", inet_ntoa(client_adr.sin_addr), ntohs(client_adr.sin_port));
-		error_check(client_fd, "연결요청 승인");
 		
-		clnt_buf[clnt_count % CLNT_BUF_SIZE] = client_fd;
-		clnt_count ++;
-		clnt_real_count ++;
 		// user over 2 waiting
 		if(clnt_real_count >= 2){
 			if( pid != 0 )pid = fork();
@@ -132,6 +149,15 @@ void socket_settings(char *port)
 				exit(1);
 			}
 		}
+		
+		client_adr_size=sizeof(client_adr);
+		client_fd=accept(server_fd, (struct sockaddr *)&client_adr, &client_adr_size); //특정 클라이언트와 데이터 송수신용 TCP소켓 생성
+		printf("* %s:%d의 연결요청\n", inet_ntoa(client_adr.sin_addr), ntohs(client_adr.sin_port));
+		error_check(client_fd, "연결요청 승인");
+		
+		pthread_create(&t_id_t, NULL, menu, (void *) &client_fd);
+		
+		
 
 	}	
 	
@@ -225,8 +251,206 @@ void* client_game_init2(void * arg)
 		printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
 		error_check(array_len, "데이터전송");
 		recv_len = 0;
+		
+		if (p.p_turn[3] != 0){
+			break;
+		}
+		
 	}
+	
+	
 	
 }
 
+
+
+int get_account(FILE * fp) //data.txt에서 데이터를 읽어옴 
+{		
+	char buffer[1001],*token; 
+ 
+    int i=0;
+    int idx = 0;
+    while (!feof(fp)) {
+        i = 0;//i초기화
+        fgets(buffer, 1001, fp);//전부 읽어오기  
+        token = strtok(buffer, " "); // 스페이스 기준으로 짜르기 
+        while (token != NULL) {
+ 
+            if (i == 0) {
+                strcpy(people[idx].name, token);
+            }
+            else if (i == 1) {
+                strcpy(people[idx].pwd, token);
+            }
+            i++;
+            token = strtok(NULL, " ");
+        }
+        idx++;
+    }
+	
+	fclose(fp); // 파일 닫기
+	return idx;
+}
+void print_account(int peo_num) //data.txt에서 데이터 print
+{
+	for (int i = 0; i < peo_num; i++) {
+		if(i<peo_num-1)
+			people[i].pwd[strlen(people[i].pwd) - 1] = '\0';//enter 개행 문자 제거
+		//읽은 내용이 잘 저장됐는지 출력
+        printf("%s %s %d\n", people[i].name, people[i].pwd, people[i].lg_in);
+    }
+}
+
+void * menu(void* arg) //사용자에게 물어봄 
+{
+	int clnt = *((int*) arg);
+	while(1){
+		int lens;
+		char send[1];
+		while(1){
+			if(sizeof(send)==sizeof(char))
+			{
+			lens = read(clnt,send,sizeof(send));
+			error_check(lens , "사용자 메뉴 입력 읽기");
+			break;
+			}
+		}
+		printf("%s\n", send);
+	
+		if(send[0]=='1')
+			login(clnt);
+		else if(send[0]=='2')
+			sign_up(clnt);
+		else
+			printf("메뉴 에러");
+		
+		if(flag[0] =='1'){
+			printf("로그인 성공\n");
+			break;
+		}
+		
+	}	
+	return NULL;
+}
+
+void sign_up(int clnt) // 사용자가 회원 가입 
+{
+	
+	//int status; 좀비 프로세스 삭제 과정 필요 
+	int lens;
+	while(1){
+		if(sizeof(ID)==30)
+		{
+			lens = read(client_fd, ID, sizeof(ID));
+			//printf("%d",lens);
+			error_check(lens, "회원가입 데이터 읽기");
+			printf("ID : %s\n",ID);
+			break;
+		}
+	}
+	
+	
+	while(1){
+		if(sizeof(ID)==30)
+		{
+			lens = read(client_fd, pwd , sizeof(pwd));
+			error_check(lens , "비밀번호 쓰기");	
+			printf("PWD  : %s\n",pwd);
+			break;
+		}
+	}
+	
+	FILE* fp = fopen("data.txt","a");
+	if(fp == NULL)
+	 	printf("fail to read file");
+	printf("account success\n");
+	
+	
+	write_ID_PWD(fp); //ID와 PWD는 전역 변수 
+	
+	
+	printf("메모장에 데이터 작성 \n");
+	
+
+	fclose(fp);
+	//waitpid(pid , &status , WNOHANG ); 
+	
+	
+	
+}
+void write_ID_PWD(FILE * fp)//사용자의 정보 기록 
+{
+	fputs("\n", fp);
+	fputs(ID, fp);
+	fputs(" ", fp);
+	fputs(pwd , fp);
+}
+void login(int clnt) // 사용자의 로그인 과정 
+{
+	int lens;
+	//char flag[1];//login error 0, in 1
+	//flag[0] ='0';
+		//연결완료후 로그인
+
+	lens = read(client_fd, ID, sizeof(ID));
+		//printf("%d",lens);
+	error_check(lens, "로그인 데이터 읽기");
+
+	printf("ID : %s\n",ID);
+	lens = read(client_fd, pwd , sizeof(pwd));
+	error_check(lens , "비밀번호 쓰기");	
+	printf("PWD  : %s\n",pwd);
+
+		//printf("peo_num :%d\n",peo_num);
+		//id 확인 
+	FILE* fp = fopen("data.txt","rw");
+	if(fp == NULL)
+	 	printf("fail to read file");
+	printf("account success\n");
+	
+	peo_num = get_account(fp); 
+	print_account(peo_num);
+	
+	//printf("%s\n",people[0].pwd);
+		//printf("%d\n",strcmp(people[0].pwd,pwd));
+		//printf("%d\n",strcmp(people[1].pwd,pwd));
+	for(int i=0; i<peo_num; i++)
+	{
+		if((strcmp(people[i].name , ID)) == 0)
+		{
+			if(strcmp(people[i].pwd , pwd) == 0)
+			{
+				if(people[i].lg_in == 0){
+					printf("아이디와 비밀번호 일치\n");
+					flag[0] ='1';
+					printf("================================\n");
+					lens = write(client_fd, flag, sizeof(flag));
+					error_check(lens , "로그인 결과 전송");
+					//people[i].lg_in =1; 텍스트에 접근하여 고치기 
+					
+					clnt_buf[clnt_count % CLNT_BUF_SIZE] = clnt;
+					clnt_count ++;
+					clnt_real_count ++;
+					printf("clnt count: %d\n", clnt_real_count);
+					return;
+				}
+				else 
+					printf("접속중인 아이디 입니다.\n");
+			}
+			else
+			{
+				printf("비밀번호가 다름\n");
+			}		
+		}
+		else
+		{
+			printf("아이디와 비밀번호가 다름\n");
+		}
+	}
+	printf("================================\n");
+	lens = write(client_fd, flag, sizeof(flag));
+	error_check(lens , "로그인 결과 전송");
+	return;
+	
+}
 

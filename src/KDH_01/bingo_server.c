@@ -19,7 +19,7 @@ void socket_settings(char *port); //소켓의 세팅
 void error_check(int validation, char *message); //실행 오류 검사
 void client_game_init(); //클라이언트 빙고판 생성
 void * client_game_init2(void * arg);
-void force_quit_check(int turn[0]);
+void force_quit_check(int *turn);//클라오류용
 
 int server_board[BOARD_SIZE][BOARD_SIZE]; //서버 보드판 배열
 int client_board[BOARD_SIZE][BOARD_SIZE]; //클라이언트 보드판 배열
@@ -65,11 +65,11 @@ void main(int argc, char *argv[])
 void socket_settings(char *port)
 {
 	struct sockaddr_in server_adr, client_adr;
-	// struct sigaction sa; //시그널 관련 코드 시작
-	// sa.sa_handler = handler; 
-	// sa.sa_flags = SA_NODEFER | SA_NOCLDWAIT;
-	// sigemptyset(&sa.sa_mask); 
-	// sa.sa_restorer = NULL; sigaction(SIGCHLD, &sa, NULL); // 시그널 관련 코드 종료
+	
+	struct sigaction sa; //시그널 관련 코드 시작
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = 0;
+	sigaction(SIGCHLD, &sa, NULL); // 시그널 관련 코드 종료
 
 	socklen_t client_adr_size;
 	pid_t pid = 1;
@@ -129,6 +129,8 @@ void socket_settings(char *port)
 			// fork error
 			else{
 				perror("fork");
+				//clnt_count --;
+				//clnt_real_count --;
 				exit(1);
 			}
 		}
@@ -137,9 +139,6 @@ void socket_settings(char *port)
 	
 }
 
-// void handler(int sig) { // 	SIGCHLD 처리 
-// 	while (waitpid(-1, NULL, WNOHANG) > 0);
-// }
 
 
 void error_check(int validation, char* message)
@@ -208,6 +207,7 @@ void* client_game_init2(void * arg)
 				printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
 				recv_len+=recv_count;
 			}
+			
 			array_len=write(child_clnt_buf[1], turn, sizeof(turn));
 			printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
 			error_check(array_len, "데이터전송");	
@@ -225,13 +225,15 @@ void* client_game_init2(void * arg)
 			printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
 			error_check(array_len, "데이터전송");
 		}
+		force_quit_check(turn);
 		recv_len=0;
 	}
 	
 }
 
-void force_quit_check(int turn[0]){
+void force_quit_check(int *turn){
 	if (turn[0]<1 && 25<turn[0])
 		sleep(10);
+	
 }
 

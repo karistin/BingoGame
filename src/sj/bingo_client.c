@@ -14,7 +14,7 @@ int menu();
 void sign_up();
 int socket_fd; //소켓 파일디스크립터
 char ID[30] , pwd[30]; //ID / PWD 저장 
-
+char flag[1];
 int turn[4]; //어플리케이션 프로토콜 정의
 /*
 	turn[0]=플레이어 숫자선택
@@ -33,19 +33,32 @@ void main(int argc, char *argv[])
 		exit(1);
 	}
 
+	
+	flag[0] =='0'; 
+	
 	socket_settings(argv[1], argv[2]);
 
 	system("clear");
 	
-	menu_value =menu();
 	
-	if(menu_value == 1)
-		login();
-	else if (menu_value == 2)
-		sign_up();
-	else
-		printf("메뉴 설정 에러 \n");
-	printf("정상 종료\n");
+	while(1){
+		menu_value =menu();
+
+		if(menu_value == 1)
+			login();
+		else if (menu_value == 2)
+			sign_up();
+		else 
+			printf("비정상 종료");
+		
+		if (flag[0] =='1')
+		{
+			printf("로그인 성공\n");
+			break;
+		}
+	}
+	
+	
 	exit(1);
 	printf("빙고게임을 시작합니다.\n");
 
@@ -80,6 +93,7 @@ void error_check(int validation, char* message)
 }
 int menu()
 {
+	
 	int value;//사용자 입력
 	int c;//숫자 확인 
 	char send[1];//보낼 문자열
@@ -136,7 +150,7 @@ void login()
 	printf("로그인 확인 중 입니다.\n");
 	//sleep(1);
 	//연결완료후 로그인 
-	char flag[1]; //login error 0, in 1
+	//char flag[1]; //login error 0, in 1
 
 	while(1){
 		if(sizeof(flag)==sizeof(char))
@@ -151,6 +165,7 @@ void login()
 	if(flag[0] =='1' )
 		printf("로그인 성공\n");
 	else{
+		system("clear");
 		printf("로그인 실패\n");
 		
 	}
@@ -171,8 +186,5 @@ void sign_up()
 	printf("PAWORD를 입력해 주세요 \n");
 	scanf("%s",pwd);
 	lens = write(socket_fd , pwd , sizeof(pwd));
-	error_check(lens, "회원가입 비밀번호 데이터 쓰기");
-	
-	
-	
+	error_check(lens, "회원가입 비밀번호 데이터 쓰기");	
 }

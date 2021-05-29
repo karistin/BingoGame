@@ -110,11 +110,13 @@ int main ()
 	else 
 	{
 		printf("1\n");
-		sigaction(SIGCHLD, &act, 0);
+		if(sigaction(SIGCHLD, &act, 0))
+			print_msg();
 		printf("2\n");
 		printf("3\n");
-		//signal(SIGALRM , print_msg());
-		sleep(100);
+		//if(!signal(SIGALRM , print_msg()))
+		//print_msg();
+		
 		
 		
 	}
