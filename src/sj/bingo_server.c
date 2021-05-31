@@ -393,7 +393,7 @@ void login(int clnt) // 사용자의 로그인 과정
 					printf("================================\n");
 					lens = write(client_fd, flag, sizeof(flag));
 					error_check(lens , "로그인 결과 전송");
-					//people[i].lg_in =1; 텍스트에 접근하여 고치기 
+					people[i].lg_in =1; // 접속중으로 변경 
 					
 					clnt_buf[clnt_count % CLNT_BUF_SIZE] = clnt;
 					clnt_count ++;

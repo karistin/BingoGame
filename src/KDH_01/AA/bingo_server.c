@@ -6,8 +6,6 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <pthread.h> //-
-#include <signal.h>
-
 #define BOARD_SIZE 5
 #define BACKLOG 3 //연결대기 큐 숫자
 #define CLNT_BUF_SIZE 256 //-
@@ -97,11 +95,6 @@ void socket_settings(char *port)
 {
 	struct sockaddr_in server_adr, client_adr;
 	socklen_t client_adr_size;
-	
-	struct sigaction sa; //시그널 관련 코드 시작
-	sa.sa_handler = SIG_IGN;
-	sa.sa_flags = 0;
-	sigaction(SIGCHLD, &sa, NULL); // 시그널 관련 코드 종료
 
 	server_fd=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP); //TCP 소켓 생성
 	error_check(server_fd, "소켓 생성");
@@ -226,23 +219,18 @@ void* client_game_init2(void * arg)
 		recv_len = 0;
 		
 		if (p.p_turn[3] != 0){
-			
 			break;
 		}
 		
 	}
 	
-	while (recv_len != sizeof(ID)){
-		recv_count=read(my_clnt, &ID, sizeof(ID));
+	while (recv_len != sizeof(p)){
+		recv_count=read(my_clnt, &p, sizeof(p));
 		error_check(recv_count, "데이터수신");
 		if(recv_count==0) break;
-		printf("%d 바이트: 클라이언트의 ID 정보를 수신하였습니다\n", recv_count);
+			printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
 		recv_len+=recv_count;
 	}
-	
-	FILE* fp = fopen("data.txt","rw");
-	
-	
 	
 }
 
