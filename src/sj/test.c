@@ -4,7 +4,19 @@
 #include <arpa/inet.h>
 #include <signal.h>
 void print_msg();
+
+void print_account(int peo_num); 
+int get_account(FILE * fp);
+
+typedef struct people_information{
+	char name[30];
+	char pwd[30];
+	int lg_in;//1는 로그인중 0는 로그아웃 
+}people_info;
+
+
 int a=6; // global 
+people_info people[100];
 
 
 void read_childproc(int sig){
@@ -17,9 +29,7 @@ void read_childproc(int sig){
 }
 
 int main ()
-{
-	
-	
+{	
 	// char a[20]="ksj";
 	// char b[20]="kakak";
 	// char c[20]="ksj";
@@ -88,6 +98,7 @@ int main ()
 		
 	// //전역 변수는 포크시 만들어감 다만 내용의 변화는 서로 다르다. 
 	
+	/*
 	pid_t pid;
 	
 	struct sigaction act;
@@ -120,9 +131,100 @@ int main ()
 		
 		
 	}
+	*/
+	
+	FILE *fp =fopen("data.txt","rw");
+	int peo_num;
+	
+	
+	char buffer[1001]; 
+	char setn[1]="1";
+	int pos =0;
+	// for(int i=0; i<pos; i++)
+	// 	fgets(buffer, 1001, fp);//전부 읽어오기  
+	fseek(fp , 7 , SEEK_SET);
+	fputs(setn , fp);
+	//fwrite("1", sizeof(char) , 1,fp );
+	
+	
 
+	// peo_num = get_account(fp);
+	// print_account(peo_num);
+
+// 	char buffer[1001],*token;
+// 	int i=0;
+// 	int idx = 0;
+	
+// 	fgets(buffer, 1001, fp);
+	
+// 	printf("buffer :%s\n" , buffer);
+// 	token = strtok(buffer, " ");
+//     while (token!=NULL)               // 자른 문자열이 나오지 않을 때까지 반복
+//     {
+        
+// 		printf("%s\n", token);   // 자른 문자열 출력
+// 		if (i == 0) {
+// 			strcpy(people[idx].name, token);
+// 		}
+// 		else if (i == 1) {
+// 			strcpy(people[idx].pwd, token);
+// 		}
+// 		else if(i==2){
+// 			people[idx].lg_in =atoi(token);
+// 		}
+// 		i++;
+		
+//         token = strtok(NULL, " ");      // 다음 문자열을 잘라서 포인터를 반환
+// 	}
+// 	printf("%s %s %d \n", people[0].name, people[0].pwd ,people[idx].lg_in );
+	
 }
 
+int get_account(FILE * fp) //data.txt에서 데이터를 읽어옴 
+{		
+	char buffer[1001],*token; 
+ 
+    int i=0;
+    int idx = 0;
+    while (!feof(fp)) {
+        i = 0;//i초기화
+        fgets(buffer, 1001, fp);//전부 읽어오기  
+		printf("buffer :%s\n" , buffer);
+        token = strtok(buffer, " "); // 스페이스 기준으로 짜르기 
+		//printf("before :%s\n" , token);
+        while (token != NULL) {
+ 
+            if (i == 0) {
+                strcpy(people[idx].name, token);
+            }
+            else if (i == 1) {
+                strcpy(people[idx].pwd, token);
+            }
+			else if(i==2){
+				people[idx].lg_in =atoi(token);
+			}
+			// else if(token = "\0"){
+			// 	break;
+			// }
+            i++;
+            token = strtok(NULL, " ");
+			//printf("after :%s\n" , buffer);
+        }
+        idx++;
+    }
+	
+	fclose(fp); // 파일 닫기
+	return idx;
+}
+void print_account(int peo_num) //data.txt에서 데이터 print
+{
+	for (int i = 0; i < peo_num; i++) {
+		//if(i<peo_num-1)
+			//people[i].lg_in[strlen(people[i].pwd) - 1] = '\0';//enter 개행 문자 제거
+		//읽은 내용이 잘 저장됐는지 출력
+        printf("%s %s %d\n", people[i].name, people[i].pwd, people[i].lg_in);
+    }
+}
 void print_msg()
 {
 	printf("자식이 종료되었습니다.");

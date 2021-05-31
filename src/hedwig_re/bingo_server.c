@@ -128,6 +128,9 @@ void socket_settings(char *port)
 		error_check(client_fd, "연결요청 승인");
 		
 		pthread_create(&t_id_t, NULL, menu, (void *) &client_fd);
+		
+		
+
 	}	
 	
 }
@@ -211,17 +214,15 @@ void* client_game_init2(void * arg)
 	while(1){
 		while (recv_len != sizeof(p)){
 			recv_count=read(my_clnt, &p, sizeof(p));
+			error_check(recv_count, "데이터수신");
 			if(recv_count==0) break;
+				printf("%d 바이트: 클라이언트의 턴 정보를 수신하였습니다\n", recv_count);
 			recv_len+=recv_count;
 		}
 		
-		if (p.p_turn[0] == -1){
-			printf("someone disconnected\n");
-			write(other_clnt, NULL, 0);
-			break;
-		}
-		
 		array_len=write(other_clnt, &p, sizeof(p));
+		printf("%d 바이트: 클라이언트의 턴 정보를 전송하였습니다\n", array_len);
+		error_check(array_len, "데이터전송");
 		recv_len = 0;
 		
 		if (p.p_turn[3] != 0){
@@ -231,8 +232,6 @@ void* client_game_init2(void * arg)
 		
 	}
 	
-	
-	/* 사용자가 로그아웃시 데이터 정보 변경 */
 	while (recv_len != sizeof(ID)){
 		recv_count=read(my_clnt, &ID, sizeof(ID));
 		error_check(recv_count, "데이터수신");
@@ -242,18 +241,6 @@ void* client_game_init2(void * arg)
 	}
 	
 	FILE* fp = fopen("data.txt","rw");
-	
-	int peo_test_num = get_account(fp);
-	
-	for(int i=0; i<peo_num; i++)
-	{
-		if((strcmp(people[i].name , ID)) == 0)
-		{
-			if(people[i].lg_in == 0){
-				people[i].lg_in =0;
-			}
-		}
-	}
 	
 	
 	
@@ -288,7 +275,6 @@ int get_account(FILE * fp) //data.txt에서 데이터를 읽어옴
 	fclose(fp); // 파일 닫기
 	return idx;
 }
-
 void print_account(int peo_num) //data.txt에서 데이터 print
 {
 	for (int i = 0; i < peo_num; i++) {
@@ -373,6 +359,9 @@ void sign_up(int clnt) // 사용자가 회원 가입
 
 	fclose(fp);
 	//waitpid(pid , &status , WNOHANG ); 
+	
+	
+	
 }
 void write_ID_PWD(FILE * fp)//사용자의 정보 기록 
 {
@@ -423,6 +412,7 @@ void login(int clnt) // 사용자의 로그인 과정
 					lens = write(clnt, flag, sizeof(flag));
 					error_check(lens , "로그인 결과 전송");
 					people[i].lg_in =1; //텍스트에 접근하여 고치기 
+					
 					clnt_buf[clnt_count % CLNT_BUF_SIZE] = clnt;
 					clnt_count ++;
 					clnt_real_count ++;
@@ -452,6 +442,7 @@ void login(int clnt) // 사용자의 로그인 과정
 
 void *ginit(){
 	while(1){
+		
 		if(clnt_real_count >= 2){
 			printf("clnt_real_count : %d\n" , clnt_real_count);
 			if( pid != 0 )pid = fork();

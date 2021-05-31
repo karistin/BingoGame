@@ -7,8 +7,7 @@
 #include <sys/socket.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <pthread.h>
-#include <signal.h>
+#include <pthread.h> 
 
 #define BOARD_SIZE 5
 #define MSG_SIZE 100
@@ -20,7 +19,6 @@ bool check_winner();
 void send_winner();
 void * send_msg(void * arg);
 void * recv_msg(void * arg);
-void down();
 	
 int bingo_check(int board[][BOARD_SIZE]);
 int board[BOARD_SIZE][BOARD_SIZE]; //보드판 배열
@@ -52,8 +50,6 @@ int other_turn;
 
 pthread_t re_t, se_t;
 
-pthread_mutex_t mutex;
-
 typedef struct p_token{
 	int p_turn[4];
 	char p_msg[MSG_SIZE];
@@ -64,11 +60,8 @@ p_token p;
 
 void main(int argc, char *argv[])
 {
-	
-	pthread_mutex_init(&mutex, NULL);
-	
 	int i, j;
-	int menu_value;
+int menu_value;
 	if(argc!=3)
 		
 	{
@@ -79,7 +72,6 @@ void main(int argc, char *argv[])
 	socket_settings(argv[1], argv[2]);
 	flag[0] =='0'; 
 	
-	signal(SIGINT, down);
 	
 	system("clear");
 	
@@ -132,11 +124,9 @@ void main(int argc, char *argv[])
 	pthread_join(re_t, NULL);
 	pthread_join(se_t, NULL);
 	
-	write(socket_fd, &ID, sizeof(ID));
-	
 	close(socket_fd);
 	
-	pthread_mutex_destroy(&mutex);
+	
 
 	printf("빙고게임을 종료합니다\n");
 }
@@ -296,16 +286,6 @@ void * recv_msg(void * arg) // read thread main
         if(str_len==-1)
         	return (void*)-1;
 		
-		if (str_len == 0){
-			printf("other player disconnected \n");
-			printf("press enter to exit \n");
-			p.p_msg[3] = turn_order[0];
-			write(socket_fd, &p, sizeof(p));
-			return NULL;
-				  
-		}
-		
-		pthread_mutex_lock(&mutex);
 		
 
         p.p_msg[str_len]='\0';
@@ -319,25 +299,21 @@ void * recv_msg(void * arg) // read thread main
 			if(check_winner()){
 				send_winner();
 				if (p.p_turn[3] == turn_order[0]){
-					pthread_mutex_unlock(&mutex);
 					return NULL;
 				}
 				else{
 					printf("you defeat.... \n");
 					printf("pls press enter to exit\n");
-					pthread_mutex_unlock(&mutex);
 					return NULL;
 				}
+
 			}
 			printf("recv number %d\n", p.p_turn[0]);
 			now_turn++;
 		}
 		else{		  
         	fputs(p.p_msg, stdout);
-			printf("\n");
-			printf(">>> ");
 		}
-		pthread_mutex_unlock(&mutex);
 		
 		if (p.p_turn[other_turn] >= 5){
 			game_print(p.p_turn[0], now_turn);
@@ -355,20 +331,18 @@ void * recv_msg(void * arg) // read thread main
 {
 	char temp[3];
 	int number = 0;
-	 char msg_tmp [MSG_SIZE];
 	 char c;
 	  while(c=getchar()!='\n'&& c!=EOF );
     while(1)
     {
-		pthread_mutex_unlock(&mutex);
 		if (p.p_turn[3] != 0){
 			return NULL;
 		}
 		printf(">>> ");
-        fgets(msg_tmp, MSG_SIZE, stdin);
+        fgets(p.p_msg, MSG_SIZE, stdin);
 
 		// 옵션 사용시
-		if (msg_tmp[0] == '='){
+		if (p.p_msg[0] == '='){
 			
 			if (now_turn % 2 == 0){
 				printf("other player turn \n");
@@ -376,14 +350,14 @@ void * recv_msg(void * arg) // read thread main
 				continue;
 			}
 			
-			if (strlen(msg_tmp) > 4){
+			if (strlen(p.p_msg) > 4){
 				printf("worng options try again sizeof \n");
 				continue;
 			}
 			
-			if (strlen(msg_tmp) == 3){
-				if (isdigit(msg_tmp[1])){
-					temp[0] = msg_tmp[1];
+			if (strlen(p.p_msg) == 3){
+				if (isdigit(p.p_msg[1])){
+					temp[0] = p.p_msg[1];
 					temp[1] = '\0';
 				}
 				
@@ -393,10 +367,10 @@ void * recv_msg(void * arg) // read thread main
 				}
 			}
 			
-			else if (strlen(msg_tmp) == 4){
-				if ((isdigit(msg_tmp[1])) && (isdigit(msg_tmp[2]))){
-					temp[0] = msg_tmp[1];
-					temp[1] = msg_tmp[2];
+			else if (strlen(p.p_msg) == 4){
+				if ((isdigit(p.p_msg[1])) && (isdigit(p.p_msg[2]))){
+					temp[0] = p.p_msg[1];
+					temp[1] = p.p_msg[2];
 					temp[2] = '\0';
 				}
 				else{
@@ -412,10 +386,6 @@ void * recv_msg(void * arg) // read thread main
 			
 			number = atoi(temp);
 			
-			pthread_mutex_lock(&mutex);
-			
-			strcpy(p.p_msg, msg_tmp);
-			
 			if ((number >= 1) && (number <= 25) && (check_number[number] == 0)){
 				
 				p.p_turn[0] = number;
@@ -426,12 +396,12 @@ void * recv_msg(void * arg) // read thread main
 					now_turn++;
 					
 					printf("상대방의 차례입니다.\n");
+					
+					write(socket_fd, &p, sizeof(p));
 					if(check_winner()){
 						send_winner();
-						pthread_mutex_unlock(&mutex);
 						return NULL;
 					}
-					write(socket_fd, &p, sizeof(p));
 				}
 				else{
 					printf("already check try again \n");
@@ -441,17 +411,12 @@ void * recv_msg(void * arg) // read thread main
 			
 			else{
 				printf("worng number try again \n");
-				printf("%d\n", number);
 				continue;
 			}
-			pthread_mutex_unlock(&mutex);
 		}
 	
 		else{
-			strcpy(p.p_msg, msg_tmp);
-			pthread_mutex_lock(&mutex);
 			write(socket_fd, &p, sizeof(p));
-			pthread_mutex_unlock(&mutex);
 		}
 		 
         
@@ -557,10 +522,4 @@ void sign_up()
 	error_check(lens, "회원가입 비밀번호 데이터 쓰기");	
 }
 
-void down(){
-	int tmp[1] = {-1};
-	printf("you defeat, do not try again\n");
-	write(socket_fd, tmp, sizeof(tmp));
-	close(socket_fd);
-	exit(1);
-}
+
