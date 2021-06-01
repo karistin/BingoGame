@@ -1,31 +1,32 @@
-# TCP
-* 서버 접속 
-	>  ssh -p 55795 root@13.124.191.220
-* 네트워 프로그램 
+# TCP 프로그래밍 3차 과제
+* 프로그램 파일 위치 
 
-	socket 
-	> icmp 프로토몰을 사용하는 ping 명령어
-	> icmp 프로토콜을 사용하는  traceroute 명령어
+	TCP/src/hedwig/
+		> bingo_server.c 
+		> bingo_client.c 
+		> Makefile
+		> data.txt
+		
+
+ * data.txt
+ 
+ 	사용자의 ID 와 PWD를 저장하는 텍스트 파일 
 	
-	dns nslookup
+	ID PWD 형식으로 이루어짐 
 	
-	네트웍 상태 확인 netstat / ifconfig /ipconfig ㅣㄴ
+ * Makefile
+ 	
+ * bingo_server.c 
+ 
+ 	실행 명령어 
+		 /.bingo_server <port>
 	
+	핵심 함수
 	
-	TCP 내부 동작 원리
-소켓에 존재하는 입출력 퍼버 => socket()
- 입	출
-S	  C	
- 출	입
-불러오지 못한다. 
-상대 소켓 과의 연결 
-=>bind() listen() accept() coonect()
-
-상대 소켓 대이터 송수신 
-read() / write()
-
-상대 소켓 데이터 연결 종료 
-close()
-
-
+	menu() : 클라이언트의 로그인 회원가입 결정
+	
+	login() : 입력한 ID/PWD를 data.txt에서 확인 
+	
+	signup() : 입력한 내용 data.txt에 저장 
+	
 	
