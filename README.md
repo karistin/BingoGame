@@ -49,7 +49,7 @@ gcc  bingo_server.c -o bingo_server -lpthread
 <br/>
 
 ### 프로그램 흐름도
-<br/>
+
 <img src = "./Img/programFlow.png"
 	width = "600"
 	height = "400"
@@ -58,11 +58,14 @@ gcc  bingo_server.c -o bingo_server -lpthread
 
 ### 클라이언트 설계 
 
-<br/>
 <img src = "./Img/client.png"
 	width = "600"
 	height = "400"
 />  
+
+- 동일 아이디 접속 불가 
+- 회원 가입을 통한 아이디 접속 
+- data.txt에 기록 
 
 ### 서버 설계 
 <br/>
@@ -71,6 +74,10 @@ gcc  bingo_server.c -o bingo_server -lpthread
 	height = "400"
 />  
 
+- 사용자가 들어오면 상대방을 만날때 까지 매칭을 기다린다.
+- 각 방은 자식 프로세스를 만들어서 들어온 사용자 2명의 네트웍 버퍼를 넘겨준다. 
+- 이로써 서버에 각 게임 방과 연관없이 구동할 수 있다. 
+- 매칭된 플레이어는 숫자를 이용하여 빙고 게임을 하거나 채팅을 칠 수 있다. 
 
 ## 파일 구조 
 ---
@@ -84,12 +91,11 @@ gcc  bingo_server.c -o bingo_server -lpthread
 ```
 
 ### **data.txt**
-<center>
-	<img src = "./Img/login.png"
-	width = "300"
-	height = "200"
-	/> 
-</center>
+
+<img src = "./Img/login.png"
+width = "300"
+height = "200"
+/> 
 
 사용자의 ID 와 PWD를 저장하는 텍스트 파일  
 ### **Makefile**
@@ -99,23 +105,12 @@ gcc  bingo_server.c -o bingo_server -lpthread
 > make clean # 파일 제거 
 ```
 
-## 실행 방법
+	
+## 결론 
 
-```bash
-cd ./src/
-```
+>멀티 쓰레드와 멀티 프로세스를 활용하여 서버를 구축하며, 쓰레드와 멀티 프로세스를 사용하고 분배하는 방안을 익힐 수 있었다.
 
- * bingo_server.c 
- 
- 	실행 명령어 
-		 /.bingo_server <port>
-	
-	핵심 함수
-	
-	menu() : 클라이언트의 로그인 회원가입 결정
-	
-	login() : 입력한 ID/PWD를 data.txt에서 확인 
-	
-	signup() : 입력한 내용 data.txt에 저장 
-	
-	
+>클라이언트간 통신을 위해 정해진 구조체와 문법을 사용하여, 통신하는 방법에 대해 자세히 익힐 수 있었다.
+
+>좀비 프로세스와 강제종료로 인한 예상치 못한 상황을 대처하기 위해 시그널을 이용하여, 이러한 문제들을 적절히 처리하고 대비하는 방법을 연습할 수 있었다.
+
