@@ -97,7 +97,7 @@ gcc  bingo_server.c -o bingo_server -lpthread
 ---
 
 ```bash
- TCP/src/hedwig/
+ TCP/src/
   > bingo_server.c  # 서버 파일
   > bingo_client.c  # 클라 파일
   > Makefile        # make , make clean
