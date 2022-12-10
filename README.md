@@ -1,4 +1,4 @@
-# TCP 프로그래밍을 이용한 빙고 게임
+# TCP 소켓 프로그래밍을 이용한 빙고 게임
 
 <img src = "Img/game.png"
  width = "600"
