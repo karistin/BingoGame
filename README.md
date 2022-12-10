@@ -79,7 +79,7 @@ gcc  bingo_server.c -o bingo_server -lpthread
 
 ## 게임 방법
 
-<img src = "Img/room.png"
+<img src = "Img/gameRoom.png"
  width = "300"
  height = "200"
 />  
