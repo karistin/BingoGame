@@ -50,17 +50,17 @@ gcc  bingo_server.c -o bingo_server -lpthread
 
 ### 프로그램 흐름도
 
-<img src = "./Img/programFlow.png"
-	width = "600"
-	height = "400"
+<img src = "Img/programFlow.png"
+	width = "300"
+	height = "200"
 />  
 
 
 ### 클라이언트 설계 
 
-<img src = "./Img/client.png"
-	width = "600"
-	height = "400"
+<img src = "Img/client.png"
+	width = "300"
+	height = "200"
 />  
 
 - 동일 아이디 접속 불가 
@@ -69,9 +69,9 @@ gcc  bingo_server.c -o bingo_server -lpthread
 
 ### 서버 설계 
 <br/>
-<img src = "./Img/server.png"
-	width = "600"
-	height = "400"
+<img src = "Img/server.png"
+	width = "300"
+	height = "200"
 />  
 
 - 사용자가 들어오면 상대방을 만날때 까지 매칭을 기다린다.
@@ -92,7 +92,7 @@ gcc  bingo_server.c -o bingo_server -lpthread
 
 ### **data.txt**
 
-<img src = "./Img/login.png"
+<img src = "Img/login.png"
 width = "300"
 height = "200"
 /> 
