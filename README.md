@@ -1,7 +1,7 @@
 # TCP 프로그래밍을 이용한 빙고 게임 
 
 <center>
-<img src = "./Img/game.png"
+<img src = "Img/game.png"
 	width = "600"
 	height = "400"
 />  
